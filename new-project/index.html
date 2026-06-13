@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MarketMind AI — Live Indian Stock Market Dashboard</title>
+  <meta name="description" content="AI-powered live Indian stock market dashboard — real-time NIFTY, SENSEX, sector trends and intelligent market agent powered by Gemini AI." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg-particles" id="bgParticles"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <div class="brand-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+        </svg>
+      </div>
+      <span class="brand-name">MarketMind <span class="brand-ai">AI</span></span>
+    </div>
+
+    <div class="nav-center">
+      <div class="market-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Market Open</span>
+      </div>
+      <div class="ist-time" id="istTime"></div>
+      <div class="live-badge" id="liveBadge">
+        <span class="live-dot"></span> LIVE
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <div class="refresh-info" id="refreshInfo">
+        <span class="refresh-label">Next update</span>
+        <span class="refresh-countdown" id="countdown">2:00</span>
+      </div>
+      <button class="btn-refresh" id="refreshBtn" onclick="manualRefresh()">
+        <svg id="refreshIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        Refresh
+      </button>
+    </div>
+  </nav>
+
+  <!-- Update Banner -->
+  <div class="update-banner" id="updateBanner">
+    <div class="update-spinner"></div>
+    <span>Fetching live market data from NSE/BSE…</span>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dashboard">
+
+    <!-- LEFT: Indices -->
+    <aside class="panel indices-panel">
+      <div class="panel-header">
+        <h2 class="panel-title"><span class="panel-icon">📊</span> Key Indices</h2>
+        <span class="data-src-badge">Yahoo Finance</span>
+      </div>
+      <div class="indices-list" id="indicesList">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+
+      <div class="panel-divider"></div>
+
+      <div class="adv-dec-block">
+        <h3 class="sub-title">Advance / Decline</h3>
+        <div class="adv-dec-bar-wrap">
+          <div class="adv-bar" id="advBar" style="width:60%">60%</div>
+          <div class="dec-bar" id="decBar" style="width:40%">40%</div>
+        </div>
+        <div class="adv-dec-labels">
+          <span class="label-adv" id="advCount">— ▲</span>
+          <span class="label-dec" id="decCount">— ▼</span>
+        </div>
+      </div>
+
+      <div class="panel-divider"></div>
+
+      <div class="fii-dii-block">
+        <h3 class="sub-title">FII / DII Activity</h3>
+        <div class="fii-row">
+          <span class="fii-label">FII Net</span>
+          <span class="fii-value positive" id="fiiVal">Fetching…</span>
+        </div>
+        <div class="fii-row">
+          <span class="fii-label">DII Net</span>
+          <span class="fii-value" id="diiVal">Fetching…</span>
+        </div>
+      </div>
+
+      <div class="panel-divider"></div>
+
+      <!-- Top Stocks Mini List -->
+      <div>
+        <h3 class="sub-title">Watched Stocks</h3>
+        <div class="watched-stocks" id="watchedStocks">
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: Charts + Heatmap + Movers -->
+    <main class="main-content">
+      <section class="chart-section">
+        <div class="chart-header">
+          <div class="chart-tabs">
+            <button class="chart-tab active" data-index="NIFTY 50" onclick="switchChart(this,'NIFTY 50')">NIFTY 50</button>
+            <button class="chart-tab" data-index="SENSEX" onclick="switchChart(this,'SENSEX')">SENSEX</button>
+            <button class="chart-tab" data-index="BANK NIFTY" onclick="switchChart(this,'BANK NIFTY')">BANK NIFTY</button>
+            <button class="chart-tab" data-index="NIFTY IT" onclick="switchChart(this,'NIFTY IT')">NIFTY IT</button>
+          </div>
+          <div class="chart-time-tabs">
+            <button class="time-tab active" onclick="switchTimeframe(this,'1D')">1D</button>
+            <button class="time-tab" onclick="switchTimeframe(this,'1W')">1W</button>
+            <button class="time-tab" onclick="switchTimeframe(this,'1M')">1M</button>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="mainChart"></canvas>
+          <div class="chart-overlay-info">
+            <span class="chart-current-val" id="chartCurrentVal">—</span>
+            <span class="chart-change" id="chartChange">Loading…</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="sector-section">
+        <div class="section-header">
+          <h2 class="section-title">Sector Heatmap</h2>
+          <span class="section-subtitle">Live NSE sector performance</span>
+        </div>
+        <div class="heatmap-grid" id="heatmapGrid"></div>
+      </section>
+
+      <section class="movers-section">
+        <div class="movers-tabs">
+          <button class="movers-tab active" id="gainersTab" onclick="showMovers('gainers')">🔼 Top Gainers</button>
+          <button class="movers-tab" id="losersTab" onclick="showMovers('losers')">🔽 Top Losers</button>
+          <button class="movers-tab" id="volumeTab" onclick="showMovers('volume')">🔥 High Volume</button>
+        </div>
+        <div class="movers-table">
+          <div class="movers-head">
+            <span>Symbol</span><span>LTP</span><span>Change</span><span>Volume</span>
+          </div>
+          <div class="movers-body" id="moversBody"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- RIGHT: AI Agent -->
+    <aside class="panel agent-panel">
+      <div class="panel-header">
+        <h2 class="panel-title"><span class="panel-icon">🤖</span> AI Market Agent</h2>
+        <div class="agent-status-badge" id="agentStatusBadge">
+          <span class="agent-dot"></span> <span id="agentStatusText">Ready</span>
+        </div>
+      </div>
+
+      <!-- Gemini API Key Setup -->
+      <div class="api-key-block" id="apiKeyBlock">
+        <div class="api-key-header">
+          <span class="api-key-icon">🔑</span>
+          <span class="api-key-title">Gemini API Key</span>
+          <a class="api-key-link" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Get free key ↗</a>
+        </div>
+        <div class="api-key-input-row">
+          <input type="password" class="api-key-input" id="geminiKeyInput" placeholder="AIza…" />
+          <button class="api-key-save-btn" onclick="saveApiKey()">Save</button>
+        </div>
+        <div class="api-key-note" id="apiKeyNote">Key stored locally in browser only — never sent to our servers.</div>
+      </div>
+
+      <div class="panel-divider"></div>
+
+      <!-- Live Insights -->
+      <div class="agent-insights" id="agentInsights">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+
+      <div class="panel-divider"></div>
+
+      <!-- Chat -->
+      <div class="agent-chat">
+        <h3 class="sub-title">Ask the Agent <span class="powered-by">powered by Gemini</span></h3>
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-bubble agent-bubble">
+            👋 Hello! I'm your live AI Market Agent. I have access to real-time Indian market data. Ask me anything — stocks, sectors, F&O, or market outlook. <strong>No data is saved.</strong>
+          </div>
+        </div>
+        <div class="chat-input-wrap">
+          <input type="text" class="chat-input" id="chatInput"
+            placeholder="e.g. IOB stock analysis, NIFTY trend…"
+            onkeydown="if(event.key==='Enter') sendAgentQuery()" />
+          <button class="chat-send-btn" onclick="sendAgentQuery()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+        <div class="quick-queries">
+          <button class="chip" onclick="quickQuery('IOB stock analysis')">IOB</button>
+          <button class="chip" onclick="quickQuery('NIFTY 50 trend today')">NIFTY trend</button>
+          <button class="chip" onclick="quickQuery('Top performing sectors today')">Sectors</button>
+          <button class="chip" onclick="quickQuery('Bank NIFTY outlook')">Bank NIFTY</button>
+          <button class="chip" onclick="quickQuery('Should I buy RELIANCE today?')">RELIANCE</button>
+          <button class="chip" onclick="quickQuery('FII activity impact on market')">FII/DII</button>
+        </div>
+      </div>
+
+      <div class="panel-divider"></div>
+
+      <!-- Signals -->
+      <div class="signals-block">
+        <h3 class="sub-title">📡 Live Signals</h3>
+        <div class="signals-list" id="signalsList"></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
