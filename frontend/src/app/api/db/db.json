@@ -23,6 +23,30 @@
       "password": "made",
       "role": "customer",
       "storeId": null
+    },
+    {
+      "id": "usr-mgr-st1",
+      "name": "Marcus Vance",
+      "email": "marcus@crispy.com",
+      "password": "manager123",
+      "role": "store_manager",
+      "storeId": "st1"
+    },
+    {
+      "id": "usr-mgr-st2",
+      "name": "Sarah Jenkins",
+      "email": "sarah@crispy.com",
+      "password": "manager123",
+      "role": "store_manager",
+      "storeId": "st2"
+    },
+    {
+      "id": "usr-mgr-st3",
+      "name": "Li Wei Chen",
+      "email": "li@crispy.com",
+      "password": "manager123",
+      "role": "store_manager",
+      "storeId": "st3"
     }
   ],
   "stores": [
