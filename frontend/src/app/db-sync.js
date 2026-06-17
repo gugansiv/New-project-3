@@ -299,3 +299,29 @@ export async function pushToServer(updates) {
     return null;
   }
 }
+
+// ============ STORE OPERATIONS ENDPOINTS ============
+
+export async function apiFetchStoreOps(storeId) {
+  const res = await fetch(`/api/store/ops?storeId=${storeId}`, {
+    headers: authHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to fetch store operations data');
+  }
+  return data;
+}
+
+export async function apiPostStoreOp(storeId, action, data) {
+  const res = await fetch('/api/store/ops', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ storeId, action, data })
+  });
+  const resData = await res.json();
+  if (!res.ok) {
+    throw new Error(resData.error || 'Failed to execute store operation');
+  }
+  return resData;
+}

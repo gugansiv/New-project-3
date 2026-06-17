@@ -3,7 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { INITIAL_STORES, HISTORICAL_ORDERS, MENU_ITEMS } from '../store-data';
-import { syncWithServer, pushToServer, apiLogin, apiAdminCreateStaff, apiAdminDeleteStore, apiAdminCreateStore, apiAdminFetchStaff, getToken, setToken, clearToken } from '../db-sync';
+import { 
+  syncWithServer, 
+  pushToServer, 
+  apiLogin, 
+  apiAdminCreateStaff, 
+  apiAdminDeleteStore, 
+  apiAdminCreateStore, 
+  apiAdminFetchStaff, 
+  getToken, 
+  setToken, 
+  clearToken,
+  apiAdminFetchDb,
+  apiAdminPushDb
+} from '../db-sync';
 
 export default function AdminPortal() {
   const [stores, setStores] = useState([]);
@@ -47,6 +60,76 @@ export default function AdminPortal() {
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffPassword, setNewStaffPassword] = useState('');
   const [newStaffStoreId, setNewStaffStoreId] = useState('');
+
+  // Store Operations States
+  const [dailyReports, setDailyReports] = useState([]);
+  const [stockOrders, setStockOrders] = useState([]);
+
+  // Fetch full Admin DB (reports and stock orders)
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'admin') return;
+
+    const fetchAdminData = async () => {
+      try {
+        const data = await apiAdminFetchDb();
+        if (data.daily_reports) setDailyReports(data.daily_reports);
+        if (data.stock_orders) setStockOrders(data.stock_orders);
+      } catch (err) {
+        console.warn("Failed fetching admin data:", err.message);
+      }
+    };
+
+    fetchAdminData();
+    const interval = setInterval(fetchAdminData, 4000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  const handleApproveReport = async (reportId) => {
+    try {
+      const db = await apiAdminFetchDb();
+      const updatedReports = db.daily_reports.map(r => {
+        if (r.id === reportId) return { ...r, status: 'Approved' };
+        return r;
+      });
+      await apiAdminPushDb({ daily_reports: updatedReports });
+      setDailyReports(updatedReports);
+      alert("Daily report approved!");
+    } catch (err) {
+      alert("Failed to approve report: " + err.message);
+    }
+  };
+
+  const handleApproveStockOrder = async (orderId) => {
+    try {
+      const db = await apiAdminFetchDb();
+      const order = db.stock_orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const updatedOrders = db.stock_orders.map(o => {
+        if (o.id === orderId) return { ...o, status: 'Approved' };
+        return o;
+      });
+
+      const updatedStock = db.stock_items.map(item => {
+        if (item.storeId === order.storeId) {
+          const orderedItem = order.items.find(i => i.itemName === item.itemName);
+          if (orderedItem) {
+            return { ...item, currentQty: item.currentQty + orderedItem.quantity };
+          }
+        }
+        return item;
+      });
+
+      await apiAdminPushDb({ 
+        stock_orders: updatedOrders,
+        stock_items: updatedStock
+      });
+      setStockOrders(updatedOrders);
+      alert("Restock order approved and inventory dispatched!");
+    } catch (err) {
+      alert("Failed to approve stock order: " + err.message);
+    }
+  };
 
   // Initialize data from localStorage & sync with server
   useEffect(() => {
@@ -842,6 +925,55 @@ export default function AdminPortal() {
                 );
               })}
             </div>
+
+            {/* Stock replenishment requests section */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mt-8 animate-scale-in">
+              <div className="bg-gray-50 border-b border-gray-200 p-4 flex justify-between items-center">
+                <h3 className="text-xs font-black uppercase text-black font-sans">Store Stock Replenishment Orders ({stockOrders.length})</h3>
+                <span className="text-[10px] font-black text-gray-500 uppercase">Requests Console</span>
+              </div>
+              <div className="p-4 space-y-4">
+                {stockOrders.length === 0 ? (
+                  <p className="text-xs text-gray-400 font-bold py-6 text-center">No restock requests submitted.</p>
+                ) : (
+                  stockOrders.map(order => (
+                    <div key={order.id} className="p-4 bg-neutral-50 rounded-xl border border-gray-200/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-black">{order.storeName}</span>
+                          <span className="text-[9px] bg-neutral-200 text-neutral-800 font-black px-1.5 py-0.5 rounded border border-neutral-300">ID: {order.id}</span>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-bold block mt-1">Requested by {order.requestedBy} on {new Date(order.timestamp).toLocaleString()}</span>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {order.items.map((item, idx) => (
+                            <span key={idx} className="bg-white border border-gray-200 px-2 py-0.5 rounded text-[10px] font-bold text-gray-700">
+                              {item.itemName} <span className="font-extrabold text-[#E4002B]">+{item.quantity} {item.unit}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase border ${
+                          order.status === 'Approved' 
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                            : 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse'
+                        }`}>
+                          {order.status}
+                        </span>
+                        {order.status !== 'Approved' && (
+                          <button
+                            onClick={() => handleApproveStockOrder(order.id)}
+                            className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-full transition-colors shadow-sm"
+                          >
+                            Approve & Dispatch ✓
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </section>
         )}
 
@@ -1471,6 +1603,67 @@ export default function AdminPortal() {
                         </tr>
                       );
                     })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Daily Reports list */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mt-8 animate-scale-in">
+              <div className="bg-gray-50 border-b border-gray-200 p-4 flex justify-between items-center">
+                <h3 className="text-xs font-black uppercase text-black font-sans">Store Operator Daily Reports ({dailyReports.length})</h3>
+                <span className="text-[10px] font-black text-gray-500 uppercase">Audit Ledger</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead>
+                    <tr className="bg-neutral-50 text-gray-500 border-b border-gray-200 uppercase font-black">
+                      <th className="p-3">Store Name</th>
+                      <th className="p-3">Report Date</th>
+                      <th className="p-3 text-right">Gross Sales</th>
+                      <th className="p-3 text-right">Expenses</th>
+                      <th className="p-3 text-right">Waste</th>
+                      <th className="p-3 text-center">Alerts (Staff / Stock)</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-bold text-gray-600">
+                    {dailyReports.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="p-6 text-center text-gray-400 font-bold">No daily reports received.</td>
+                      </tr>
+                    ) : (
+                      dailyReports.map(rep => (
+                        <tr key={rep.id} className="hover:bg-neutral-50/50">
+                          <td className="p-3 text-black font-extrabold">{rep.storeName}</td>
+                          <td className="p-3">{rep.date}</td>
+                          <td className="p-3 text-right text-emerald-600">₹{rep.totalSales.toFixed(2)}</td>
+                          <td className="p-3 text-right text-[#E4002B]">-₹{rep.totalExpenses.toFixed(2)}</td>
+                          <td className="p-3 text-right text-orange-600">-₹{rep.totalWaste.toFixed(2)}</td>
+                          <td className="p-3 text-center">
+                            {rep.activeShiftsCount} shifts / {rep.stockAlertsCount} alerts
+                          </td>
+                          <td className="p-3">
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase ${
+                              rep.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
+                              {rep.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right">
+                            {rep.status !== 'Approved' && (
+                              <button
+                                onClick={() => handleApproveReport(rep.id)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase rounded-full transition-colors"
+                              >
+                                Approve ✓
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
