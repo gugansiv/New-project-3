@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb, saveDb } from '../db/db-helper';
 import { verifyToken } from '../auth/token';
+import crypto from 'crypto';
 
 function getAuthUser(request) {
   const authHeader = request.headers.get('Authorization');
@@ -49,7 +50,18 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { id, storeId, storeName, items, paymentMethod, customerName, paymentId } = body;
+    const { 
+      id, 
+      storeId, 
+      storeName, 
+      items, 
+      paymentMethod, 
+      customerName, 
+      paymentId,
+      razorpayPaymentId,
+      razorpayOrderId,
+      razorpaySignature
+    } = body;
 
     if (!storeId || !items || items.length === 0) {
       return NextResponse.json({ error: 'Store and items are required.' }, { status: 400 });
@@ -66,6 +78,24 @@ export async function POST(request) {
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const tax = subtotal * 0.08;
     const total = subtotal + tax;
+
+    // Secure Signature Verification for Razorpay
+    if (paymentMethod === 'Razorpay') {
+      if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
+        return NextResponse.json({ error: 'Razorpay payment verification details are missing.' }, { status: 400 });
+      }
+      
+      const keySecret = process.env.RAZORPAY_KEY_SECRET || 'ozFBLuw1FMxAWIjP5IKWw223';
+      const text = razorpayOrderId + '|' + razorpayPaymentId;
+      const generated_signature = crypto
+        .createHmac('sha256', keySecret)
+        .update(text)
+        .digest('hex');
+
+      if (generated_signature !== razorpaySignature) {
+        return NextResponse.json({ error: 'Payment signature validation failed. Invalid transaction.' }, { status: 400 });
+      }
+    }
 
     const newOrder = {
       id: id || `ord-${Math.floor(1000 + Math.random() * 9000)}`,

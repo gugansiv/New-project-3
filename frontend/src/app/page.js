@@ -26,7 +26,7 @@ export default function Storefront() {
   const [activeCategory, setActiveCategory] = useState('Buckets');
   const [cart, setCart] = useState([]);
   const [customerName, setCustomerName] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Card');
+  const [paymentMethod, setPaymentMethod] = useState('Razorpay');
   const [razorpayKey, setRazorpayKey] = useState('');
   const [isEditingRzpKey, setIsEditingRzpKey] = useState(false);
   const [activeOrders, setActiveOrders] = useState([]);
@@ -377,7 +377,7 @@ export default function Storefront() {
     const total = subtotal + tax;
     const orderId = `ord-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const finalizeOrder = async (payId = null) => {
+    const finalizeOrder = async (payId = null, rzpOrderId = null, rzpSignature = null) => {
       const newOrder = {
         id: orderId,
         storeId: selectedStore.id,
@@ -403,7 +403,10 @@ export default function Storefront() {
           items: cart.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
           paymentMethod,
           paymentId: payId,
-          customerName: customerName.trim()
+          customerName: customerName.trim(),
+          razorpayPaymentId: payId,
+          razorpayOrderId: rzpOrderId,
+          razorpaySignature: rzpSignature
         });
         if (result.order) {
           const currentActiveOrders = JSON.parse(localStorage.getItem('ccc_active_orders') || '[]');
@@ -434,26 +437,49 @@ export default function Storefront() {
     };
 
     if (paymentMethod === 'Razorpay') {
-      if (!razorpayKey.trim()) {
-        alert('Please enter your Razorpay Test Key ID first.');
-        return;
-      }
-
       const scriptLoaded = await loadRazorpaySDK();
       if (!scriptLoaded) {
         alert('Failed to load Razorpay Checkout SDK. Please verify your internet connection.');
         return;
       }
 
+      // 1. Create Razorpay order on the server first
+      let rzpServerOrder;
+      try {
+        const token = getToken();
+        const orderRes = await fetch('/api/orders/razorpay', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ amount: total })
+        });
+        const orderData = await orderRes.json();
+        if (!orderRes.ok) {
+          throw new Error(orderData.error || 'Failed to create Razorpay order on server.');
+        }
+        rzpServerOrder = orderData;
+      } catch (err) {
+        alert('Payment preparation failed: ' + err.message);
+        return;
+      }
+
+      // 2. Open Razorpay checkout modal
       const options = {
-        key: razorpayKey.trim(),
-        amount: Math.round(total * 100), // in paise
-        currency: 'INR',
+        key: rzpServerOrder.keyId,
+        amount: rzpServerOrder.amount,
+        currency: rzpServerOrder.currency,
         name: 'Crispy Chicken Co.',
         description: `Order ID: ${orderId}`,
+        order_id: rzpServerOrder.orderId,
         handler: function (response) {
           if (response.razorpay_payment_id) {
-            finalizeOrder(response.razorpay_payment_id);
+            finalizeOrder(
+              response.razorpay_payment_id,
+              response.razorpay_order_id,
+              response.razorpay_signature
+            );
           } else {
             alert('Payment execution failed.');
           }
@@ -471,7 +497,7 @@ export default function Storefront() {
         const rzp = new window.Razorpay(options);
         rzp.open();
       } catch (err) {
-        alert('Razorpay initialization failed. Check if your Test Key ID is valid.');
+        alert('Razorpay checkout initialization failed.');
       }
     } else {
       await finalizeOrder();
@@ -1062,51 +1088,18 @@ export default function Storefront() {
 
                   <div>
                     <label className="block text-[9px] font-black text-gray-500 uppercase mb-1.5">Payment Method</label>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {['Card', 'Apple Pay', 'Cash', 'Razorpay'].map(method => (
-                        <button
-                          key={method}
-                          type="button"
-                          onClick={() => setPaymentMethod(method)}
-                          className={`py-1.5 border text-[10px] font-black rounded-lg uppercase transition-colors ${
-                            paymentMethod === method
-                              ? 'bg-black border-black text-white font-extrabold'
-                              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          {method === 'Razorpay' ? '💳 Razorpay' : method}
-                        </button>
-                      ))}
-                    </div>
-                    {paymentMethod === 'Razorpay' && (
-                      <div className="mt-2.5 p-3 bg-neutral-50 rounded-xl border border-gray-200 space-y-2 animate-scale-in">
-                        <label className="block text-[8px] font-black text-gray-500 uppercase">
-                          Razorpay Test Key ID
-                        </label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="text"
-                            placeholder="rzp_test_..."
-                            className="flex-1 min-w-0 bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold text-black focus:outline-none"
-                            value={razorpayKey}
-                            onChange={(e) => setRazorpayKey(e.target.value)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              localStorage.setItem('ccc_razorpay_key', razorpayKey.trim());
-                              alert('Razorpay Key ID saved locally!');
-                            }}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase px-2.5 py-1 rounded"
-                          >
-                            Save
-                          </button>
-                        </div>
-                        <p className="text-[7.5px] text-gray-400 font-bold leading-normal">
-                          Set your test key ID (starts with `rzp_test_`) to enable Razorpay sandbox transactions.
-                        </p>
+                    <div className="p-3 bg-neutral-50 rounded-xl border border-gray-200 space-y-2 animate-scale-in">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-black">💳 Razorpay Checkout (Test Mode)</span>
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
                       </div>
-                    )}
+                      <p className="text-[7.5px] text-gray-500 font-bold leading-normal">
+                        Orders are securely created and verified server-side using your test credentials (`rzp_test_T2eg...`).
+                      </p>
+                    </div>
                   </div>
 
                   <button
@@ -1320,51 +1313,18 @@ export default function Storefront() {
 
                   <div>
                     <label className="block text-[9px] font-black text-gray-500 uppercase mb-1.5">Payment Method</label>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {['Card', 'Apple Pay', 'Cash', 'Razorpay'].map(method => (
-                        <button
-                          key={method}
-                          type="button"
-                          onClick={() => setPaymentMethod(method)}
-                          className={`py-1.5 border text-[10px] font-black rounded-lg uppercase transition-colors ${
-                            paymentMethod === method
-                              ? 'bg-black border-black text-white font-extrabold'
-                              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          {method === 'Razorpay' ? '💳 Razorpay' : method}
-                        </button>
-                      ))}
-                    </div>
-                    {paymentMethod === 'Razorpay' && (
-                      <div className="mt-2.5 p-3 bg-white rounded-xl border border-gray-200 space-y-2 animate-scale-in">
-                        <label className="block text-[8px] font-black text-gray-500 uppercase">
-                          Razorpay Test Key ID
-                        </label>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="text"
-                            placeholder="rzp_test_..."
-                            className="flex-1 min-w-0 bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold text-black focus:outline-none"
-                            value={razorpayKey}
-                            onChange={(e) => setRazorpayKey(e.target.value)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              localStorage.setItem('ccc_razorpay_key', razorpayKey.trim());
-                              alert('Razorpay Key ID saved locally!');
-                            }}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase px-2.5 py-1 rounded"
-                          >
-                            Save
-                          </button>
-                        </div>
-                        <p className="text-[7.5px] text-gray-400 font-bold leading-normal">
-                          Set your test key ID (starts with `rzp_test_`) to enable Razorpay sandbox transactions.
-                        </p>
+                    <div className="p-3 bg-white rounded-xl border border-gray-200 space-y-2 animate-scale-in">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-black">💳 Razorpay Checkout (Test Mode)</span>
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
                       </div>
-                    )}
+                      <p className="text-[7.5px] text-gray-500 font-bold leading-normal">
+                        Orders are securely created and verified server-side using your test credentials (`rzp_test_T2eg...`).
+                      </p>
+                    </div>
                   </div>
 
                   <button
