@@ -80,16 +80,21 @@ export default function Storefront() {
 
       // Stores
       const savedStores = localStorage.getItem('ccc_stores');
+      const savedSelectedId = localStorage.getItem('ccc_selected_store_id');
       if (savedStores) {
         const parsed = JSON.parse(savedStores);
         setStores(parsed);
-        const firstOpen = parsed.find(s => s.status === 'Open');
-        setSelectedStore(firstOpen || parsed[0]);
+        if (savedSelectedId) {
+          const matched = parsed.find(s => s.id === savedSelectedId);
+          if (matched) setSelectedStore(matched);
+        }
       } else {
         localStorage.setItem('ccc_stores', JSON.stringify(INITIAL_STORES));
         setStores(INITIAL_STORES);
-        const firstOpen = INITIAL_STORES.find(s => s.status === 'Open');
-        setSelectedStore(firstOpen || INITIAL_STORES[0]);
+        if (savedSelectedId) {
+          const matched = INITIAL_STORES.find(s => s.id === savedSelectedId);
+          if (matched) setSelectedStore(matched);
+        }
       }
 
       // Active Orders
@@ -259,8 +264,12 @@ export default function Storefront() {
 
   // Add to cart
   const addToCart = (item) => {
-    if (selectedStore?.status !== 'Open') {
-      alert(`Sorry, ${selectedStore?.name} is currently closed. Please select an open store.`);
+    if (!selectedStore) {
+      alert('Please select your nearest Crispy Chicken Co. outlet from the dropdown in the header before adding items to your cart.');
+      return;
+    }
+    if (selectedStore.status !== 'Open') {
+      alert(`Sorry, ${selectedStore.name} is currently closed. Please select an open store.`);
       return;
     }
     setCart(prev => {
@@ -572,31 +581,35 @@ export default function Storefront() {
             </div>
 
             {/* Inline location display & switcher */}
-            {selectedStore && (
-              <div className="hidden lg:flex items-center gap-2 bg-gray-100 py-1.5 px-3 rounded-full border border-gray-200">
-                <span className="text-[10px] font-black text-gray-500 uppercase flex items-center gap-1">
-                  <svg className="w-3.5 h-3.5 text-[#E4002B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                  </svg>
-                  Ordering From:
-                </span>
-                <select
-                  className="bg-transparent font-black text-xs text-black focus:outline-none cursor-pointer pr-1"
-                  value={selectedStore?.id || ''}
-                  onChange={(e) => {
-                    const s = stores.find(store => store.id === e.target.value);
-                    setSelectedStore(s);
-                  }}
-                >
-                  {stores.map(store => (
-                    <option key={store.id} value={store.id} className="text-black bg-white">
-                      {store.name} ({store.status})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className={`hidden lg:flex items-center gap-2 py-1.5 px-3 rounded-full border transition-all ${
+              selectedStore ? 'bg-gray-100 border-gray-200 text-black' : 'bg-red-50 border-red-200 text-[#E4002B] animate-pulse font-extrabold'
+            }`}>
+              <span className="text-[10px] font-black text-gray-500 uppercase flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 text-[#E4002B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                {selectedStore ? 'Ordering From:' : 'Select Store:'}
+              </span>
+              <select
+                className="bg-transparent font-black text-xs text-black focus:outline-none cursor-pointer pr-1"
+                value={selectedStore?.id || ''}
+                onChange={(e) => {
+                  const s = stores.find(store => store.id === e.target.value);
+                  setSelectedStore(s);
+                  if (s) {
+                    localStorage.setItem('ccc_selected_store_id', s.id);
+                  }
+                }}
+              >
+                <option value="" disabled className="text-gray-400 bg-white">-- Select nearest outlet --</option>
+                {stores.map(store => (
+                  <option key={store.id} value={store.id} className="text-black bg-white">
+                    {store.name} ({store.status})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -658,30 +671,34 @@ export default function Storefront() {
       </header>
 
       {/* Mobile Location Selector Strip */}
-      {selectedStore && (
-        <div className="lg:hidden bg-gray-100 border-b border-gray-200 py-2.5 px-4 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1.5 text-gray-700 font-bold">
-            <svg className="w-4 h-4 text-[#E4002B] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-            </svg>
-            <span>Ordering from: <span className="font-extrabold text-black">{selectedStore.name}</span></span>
-          </div>
-          <select
-            className="bg-transparent font-black text-xs text-[#E4002B] focus:outline-none cursor-pointer"
-            value={selectedStore.id}
-            onChange={(e) => {
-              const s = stores.find(store => store.id === e.target.value);
-              setSelectedStore(s);
-            }}
-          >
-            {stores.map(store => (
-              <option key={store.id} value={store.id} className="text-black bg-white">
-                {store.status === 'Open' ? 'Open' : 'Closed'}
-              </option>
-            ))}
-          </select>
+      <div className={`lg:hidden border-b py-2.5 px-4 flex items-center justify-between text-xs transition-all ${
+        selectedStore ? 'bg-gray-100 border-gray-200 text-black' : 'bg-red-50 border-red-200 text-[#E4002B] animate-pulse font-extrabold'
+      }`}>
+        <div className="flex items-center gap-1.5 font-bold">
+          <svg className="w-4 h-4 text-[#E4002B] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+          </svg>
+          <span>{selectedStore ? `Outlet: ${selectedStore.name}` : '⚠️ Select Nearest Outlet:'}</span>
         </div>
-      )}
+        <select
+          className="bg-transparent font-black text-xs text-[#E4002B] focus:outline-none cursor-pointer"
+          value={selectedStore?.id || ''}
+          onChange={(e) => {
+            const s = stores.find(store => store.id === e.target.value);
+            setSelectedStore(s);
+            if (s) {
+              localStorage.setItem('ccc_selected_store_id', s.id);
+            }
+          }}
+        >
+          <option value="" disabled className="text-gray-400">-- Select Store --</option>
+          {stores.map(store => (
+            <option key={store.id} value={store.id} className="text-black bg-white">
+              {store.name} ({store.status})
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Sticky Category Bar for Mobile Screen sizes */}
       <div className="sticky top-[49px] z-30 bg-white border-b border-gray-200 py-3 px-4 md:hidden overflow-x-auto no-scrollbar flex gap-2">
@@ -870,8 +887,23 @@ export default function Storefront() {
             </section>
           )}
 
-          {/* Store Closed Warning Banner */}
-          {selectedStore && selectedStore.status !== 'Open' && (
+          {/* Store Selection / Closed Warning Banner */}
+          {!selectedStore ? (
+            <div className="p-4 bg-red-50 border border-red-200 text-red-950 rounded-xl mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse">
+              <div className="flex items-start gap-2.5">
+                <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <div>
+                  <h3 className="font-extrabold text-sm">📍 No Outlet Selected</h3>
+                  <p className="text-xs text-red-800 font-bold mt-0.5">
+                    Please select your nearest Crispy Chicken Co. outlet from the dropdown in the header to view menus and start ordering.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : selectedStore.status !== 'Open' ? (
             <div className="p-4 bg-red-50 border border-red-200 text-red-950 rounded-xl mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-start gap-2.5">
                 <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -885,7 +917,7 @@ export default function Storefront() {
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Menu Category Sections Stack */}
           {filteredMenuItems.length === 0 ? (
