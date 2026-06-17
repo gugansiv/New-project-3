@@ -49,7 +49,7 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { storeId, storeName, items, paymentMethod, customerName } = body;
+    const { id, storeId, storeName, items, paymentMethod, customerName, paymentId } = body;
 
     if (!storeId || !items || items.length === 0) {
       return NextResponse.json({ error: 'Store and items are required.' }, { status: 400 });
@@ -68,7 +68,7 @@ export async function POST(request) {
     const total = subtotal + tax;
 
     const newOrder = {
-      id: `ord-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: id || `ord-${Math.floor(1000 + Math.random() * 9000)}`,
       storeId,
       storeName: storeName || store.name,
       items: items.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
@@ -78,6 +78,7 @@ export async function POST(request) {
       status: 'Pending',
       timestamp: new Date().toISOString(),
       paymentMethod: paymentMethod || 'Card',
+      paymentId: paymentId || null,
       customerName: customerName || user.name,
       customerEmail: user.email
     };
