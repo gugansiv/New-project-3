@@ -64,6 +64,11 @@ export default function AdminPortal() {
   // Store Operations States
   const [dailyReports, setDailyReports] = useState([]);
   const [stockOrders, setStockOrders] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [shifts, setShifts] = useState([]);
+  const [wasteLog, setWasteLog] = useState([]);
+  const [stockItems, setStockItems] = useState([]);
+  const [opsSelectedStoreId, setOpsSelectedStoreId] = useState('');
 
   // Fetch full Admin DB (reports and stock orders)
   useEffect(() => {
@@ -74,6 +79,15 @@ export default function AdminPortal() {
         const data = await apiAdminFetchDb();
         if (data.daily_reports) setDailyReports(data.daily_reports);
         if (data.stock_orders) setStockOrders(data.stock_orders);
+        if (data.expenses) setExpenses(data.expenses);
+        if (data.shifts) setShifts(data.shifts);
+        if (data.waste_log) setWasteLog(data.waste_log);
+        if (data.stock_items) setStockItems(data.stock_items);
+        
+        // Auto-select first store if none selected
+        if (data.stores && data.stores.length > 0 && !opsSelectedStoreId) {
+          setOpsSelectedStoreId(data.stores[0].id);
+        }
       } catch (err) {
         console.warn("Failed fetching admin data:", err.message);
       }
@@ -82,7 +96,7 @@ export default function AdminPortal() {
     fetchAdminData();
     const interval = setInterval(fetchAdminData, 4000);
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentUser, opsSelectedStoreId]);
 
   const handleApproveReport = async (reportId) => {
     try {
@@ -716,7 +730,12 @@ export default function AdminPortal() {
             { id: 'menu', label: '🍔 Menu Maintenance', badge: menuItems.length },
             { id: 'orders', label: '🛎️ Orders Queue', badge: activeOrdersCount },
             { id: 'staff', label: '👥 Staff Management', badge: null },
-            { id: 'financials', label: '📊 Financial Ledger', badge: null }
+            { id: 'financials', label: '📊 Financial Ledger', badge: null },
+            { 
+              id: 'operations', 
+              label: '🏢 Store Operations', 
+              badge: (dailyReports.filter(r => r.status === 'Pending').length + stockOrders.filter(o => o.status === 'Pending').length) || null 
+            }
           ].map(tab => (
             <button
               key={tab.id}
@@ -1668,6 +1687,419 @@ export default function AdminPortal() {
                 </table>
               </div>
             </div>
+          </section>
+        )}
+
+        {/* Tab 6: Store Operations Hub */}
+        {activeTab === 'operations' && (
+          <section className="space-y-8 animate-scale-in">
+            {/* Header banner */}
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h2 className="text-base font-black uppercase text-black font-sans">🏢 Store Operations Hub</h2>
+                <p className="text-xs text-gray-500 font-bold mt-0.5">Verify and audit daily store operations, track real-time activity status, and approve stock replenishment orders.</p>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-xs font-black bg-amber-50 border border-amber-200 text-amber-700 px-3.5 py-1.5 rounded-full">
+                  ⚠️ {stockOrders.filter(o => o.status === 'Pending').length} Pending Restocks
+                </span>
+                <span className="text-xs font-black bg-blue-50 border border-blue-200 text-blue-700 px-3.5 py-1.5 rounded-full">
+                  📊 {dailyReports.filter(r => r.status === 'Pending').length} Pending Reports
+                </span>
+              </div>
+            </div>
+
+            {/* 1. Overall Network Status Progress (Overall Store Report) */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+              <h3 className="text-xs font-black uppercase text-black mb-5 border-b border-gray-100 pb-2 tracking-wider">
+                Overall Outlet Progress & Status Monitor
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead>
+                    <tr className="bg-neutral-50 text-gray-400 border-b border-gray-200 uppercase font-black">
+                      <th className="p-3">Store Name</th>
+                      <th className="p-3">Outlet Status</th>
+                      <th className="p-3 text-right">Today's Sales</th>
+                      <th className="p-3 text-right">Expenses Logged</th>
+                      <th className="p-3 text-right">Food Waste</th>
+                      <th className="p-3 text-center">Active Shifts</th>
+                      <th className="p-3 text-center">Stock Alerts</th>
+                      <th className="p-3">Restock Orders</th>
+                      <th className="p-3">Daily Report</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-bold text-gray-600">
+                    {stores.map(st => {
+                      const storeExpenses = expenses.filter(e => e.storeId === st.id);
+                      const storeShifts = shifts.filter(s => s.storeId === st.id);
+                      const storeWaste = wasteLog.filter(w => w.storeId === st.id);
+                      const storeStock = stockItems.filter(s => s.storeId === st.id);
+                      
+                      const totalStoreSales = completedOrders.filter(o => o.storeId === st.id).reduce((sum, o) => sum + o.total, 0);
+                      const totalStoreExp = storeExpenses.reduce((sum, e) => sum + e.amount, 0);
+                      const totalStoreWaste = storeWaste.reduce((sum, w) => sum + w.cost, 0);
+                      const activeShiftsCount = storeShifts.filter(s => !s.clockOut).length;
+                      const lowStockCount = storeStock.filter(s => s.currentQty <= s.minQty).length;
+                      
+                      const pendingRestocks = stockOrders.filter(o => o.storeId === st.id && o.status === 'Pending').length;
+                      const storeReports = dailyReports.filter(r => r.storeId === st.id);
+                      const latestReport = storeReports[storeReports.length - 1];
+
+                      return (
+                        <tr key={st.id} className="hover:bg-neutral-50/50">
+                          <td className="p-3 text-black font-extrabold">{st.name}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-black border uppercase ${
+                              st.status === 'Open' 
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                                : 'bg-red-50 border-red-200 text-[#E4002B]'
+                            }`}>
+                              {st.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right text-emerald-600">₹{totalStoreSales.toLocaleString()}</td>
+                          <td className="p-3 text-right text-[#E4002B]">₹{totalStoreExp.toLocaleString()}</td>
+                          <td className="p-3 text-right text-orange-600">₹{totalStoreWaste.toLocaleString()}</td>
+                          <td className="p-3 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-black border uppercase ${
+                              activeShiftsCount > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-400 border-gray-200'
+                            }`}>
+                              {activeShiftsCount} Active
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-black border uppercase ${
+                              lowStockCount > 0 ? 'bg-red-50 text-[#E4002B] border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            }`}>
+                              {lowStockCount} Alert{lowStockCount !== 1 ? 's' : ''}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            {pendingRestocks > 0 ? (
+                              <span className="bg-amber-50 text-amber-700 text-[8px] font-black border border-amber-200 px-2 py-0.5 rounded uppercase tracking-wider animate-pulse">
+                                {pendingRestocks} Pending ⚠️
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-[9px]">All Healthy ✓</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {latestReport ? (
+                              <span className={`text-[8px] font-black px-2 py-0.5 rounded border uppercase ${
+                                latestReport.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}>
+                                {latestReport.status} ({latestReport.date})
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-[9px]">No Reports</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 2. Detail Explorer (Individual Store Audit) */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+              
+              {/* Store Selector Sidebar */}
+              <div className="lg:col-span-1 bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
+                <h3 className="text-xs font-black uppercase text-black border-b border-gray-100 pb-3 tracking-wider">
+                  Select Store to Audit
+                </h3>
+                <div className="flex flex-col gap-2">
+                  {stores.map(st => (
+                    <button
+                      key={st.id}
+                      onClick={() => setOpsSelectedStoreId(st.id)}
+                      className={`text-left p-3 rounded-lg border text-xs font-bold transition-all ${
+                        opsSelectedStoreId === st.id
+                          ? 'border-[#E4002B] bg-red-50/30 text-[#E4002B] font-extrabold'
+                          : 'border-gray-200 hover:bg-neutral-50 text-gray-700'
+                      }`}
+                    >
+                      <span className="block">{st.name}</span>
+                      <span className="text-[10px] text-gray-400 font-normal mt-0.5 block">{st.manager} | {st.address.split(',')[0]}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Store Details View */}
+              <div className="lg:col-span-3 space-y-6">
+                {!opsSelectedStoreId ? (
+                  <div className="bg-white border border-gray-200 rounded-xl p-12 text-center shadow-sm flex flex-col items-center justify-center">
+                    <span className="text-4xl mb-3">🏢</span>
+                    <h4 className="text-sm font-black text-black">Select an outlet to view audit files</h4>
+                    <p className="text-xs text-gray-500 font-bold mt-1">Detailed inventory alerts, logged expenses, employee timing logs, and waste counts will load here.</p>
+                  </div>
+                ) : (() => {
+                  const selStore = stores.find(s => s.id === opsSelectedStoreId);
+                  if (!selStore) return null;
+                  const selExpenses = expenses.filter(e => e.storeId === opsSelectedStoreId);
+                  const selShifts = shifts.filter(s => s.storeId === opsSelectedStoreId);
+                  const selWaste = wasteLog.filter(w => w.storeId === opsSelectedStoreId);
+                  const selStock = stockItems.filter(s => s.storeId === opsSelectedStoreId);
+
+                  return (
+                    <div className="space-y-6">
+                      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center animate-scale-in">
+                        <div>
+                          <h3 className="text-sm font-black uppercase text-black">{selStore.name} — Full Details & Status</h3>
+                          <span className="text-[10px] text-gray-400 font-bold mt-0.5">Operational Audit Console</span>
+                        </div>
+                        <span className="text-xs font-black bg-neutral-100 border border-gray-200 text-neutral-800 px-3 py-1 rounded">
+                          Store ID: {selStore.id}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        {/* Stock Inventory Audit */}
+                        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
+                          <h4 className="text-xs font-black uppercase text-black border-b border-gray-100 pb-2.5 tracking-wider">
+                            🥔 Inventory Alert Status
+                          </h4>
+                          {selStock.length === 0 ? (
+                            <p className="text-xs text-gray-400 font-bold py-4 text-center">No inventory items loaded.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                              {selStock.map(item => {
+                                const isLow = item.currentQty <= item.minQty;
+                                return (
+                                  <div key={item.id} className="flex justify-between items-center text-xs font-bold text-gray-700">
+                                    <span>{item.itemName}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-black font-extrabold">{item.currentQty} / {item.minQty} {item.unit}</span>
+                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
+                                        isLow ? 'bg-red-50 text-[#E4002B] border border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      }`}>
+                                        {isLow ? 'Low' : 'OK'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Shift Work Logs */}
+                        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
+                          <h4 className="text-xs font-black uppercase text-black border-b border-gray-100 pb-2.5 tracking-wider">
+                            ⏱️ Today's Staff Timing Logs
+                          </h4>
+                          {selShifts.length === 0 ? (
+                            <p className="text-xs text-gray-400 font-bold py-4 text-center">No shift records found for today.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                              {selShifts.map(shift => (
+                                <div key={shift.id} className="flex justify-between items-center text-xs font-bold text-gray-700 p-2 bg-neutral-50 rounded border border-gray-200/50">
+                                  <div>
+                                    <span className="text-black font-extrabold block">{shift.staffName}</span>
+                                    <span className="text-[9px] text-gray-400 font-normal block mt-0.5">
+                                      {new Date(shift.clockIn).toLocaleTimeString()} - {shift.clockOut ? new Date(shift.clockOut).toLocaleTimeString() : 'Clocked In'}
+                                    </span>
+                                  </div>
+                                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
+                                    !shift.clockOut ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 animate-pulse' : 'bg-gray-100 text-gray-500'
+                                  }`}>
+                                    {!shift.clockOut ? 'Active' : 'Clocked Out'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Logged Expenses Ledger */}
+                        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
+                          <h4 className="text-xs font-black uppercase text-black border-b border-gray-100 pb-2.5 tracking-wider">
+                            💸 Custom Expenses Logged
+                          </h4>
+                          {selExpenses.length === 0 ? (
+                            <p className="text-xs text-gray-400 font-bold py-4 text-center">No custom expenses logged today.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                              {selExpenses.map(exp => (
+                                <div key={exp.id} className="flex justify-between items-center text-xs font-bold text-gray-700 border-b border-gray-100 pb-2">
+                                  <div>
+                                    <span className="text-black font-extrabold">{exp.description || exp.category}</span>
+                                    <span className="text-[9px] text-gray-400 font-normal block mt-0.5">{new Date(exp.timestamp).toLocaleTimeString()}</span>
+                                  </div>
+                                  <span className="text-[#E4002B] font-extrabold">₹{exp.amount.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Wasted Ingredients Log */}
+                        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
+                          <h4 className="text-xs font-black uppercase text-black border-b border-gray-100 pb-2.5 tracking-wider">
+                            🗑️ Food Spoilage & Wastage Log
+                          </h4>
+                          {selWaste.length === 0 ? (
+                            <p className="text-xs text-gray-400 font-bold py-4 text-center">No wastage entries logged today.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                              {selWaste.map(waste => (
+                                <div key={waste.id} className="flex justify-between items-center text-xs font-bold text-gray-700 border-b border-gray-100 pb-2">
+                                  <div>
+                                    <span className="text-black font-extrabold">{waste.itemName} (x{waste.quantity})</span>
+                                    <span className="text-[9px] text-gray-400 font-normal block mt-0.5">Reason: {waste.reason}</span>
+                                  </div>
+                                  <span className="text-[#E4002B] font-extrabold">₹{waste.cost.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+            </div>
+
+            {/* 3. Verification & Validation Control Desk (Stock Requests & Reports) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              
+              {/* Validation Desk: Stock Requests */}
+              <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-4">
+                <h3 className="text-xs font-black uppercase text-black border-b border-gray-100 pb-3 tracking-wider">
+                  📋 Restock Requests Validation Desk
+                </h3>
+                {stockOrders.filter(o => o.status === 'Pending').length === 0 ? (
+                  <p className="text-xs text-gray-400 font-bold py-6 text-center">No pending stock requests require verification.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {stockOrders.filter(o => o.status === 'Pending').map(order => (
+                      <div key={order.id} className="p-4 bg-neutral-50 rounded-xl border border-gray-200/50 flex flex-col justify-between gap-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-xs font-black text-black">{order.storeName}</span>
+                            <span className="text-[10px] text-gray-400 block mt-0.5">By {order.requestedBy} | {new Date(order.timestamp).toLocaleString()}</span>
+                          </div>
+                          <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded uppercase font-black">
+                            ID: {order.id}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {order.items.map((item, idx) => (
+                            <span key={idx} className="bg-white border border-gray-200 px-2.5 py-1 rounded text-[10px] font-bold text-gray-700">
+                              {item.itemName} <span className="font-extrabold text-[#E4002B]">+{item.quantity} {item.unit}</span>
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex gap-2 pt-2 border-t border-gray-100 mt-1 justify-end">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const db = await apiAdminFetchDb();
+                                const updatedOrders = db.stock_orders.map(o => {
+                                  if (o.id === order.id) return { ...o, status: 'Rejected' };
+                                  return o;
+                                });
+                                await apiAdminPushDb({ stock_orders: updatedOrders });
+                                setStockOrders(updatedOrders);
+                                alert("Restock request rejected.");
+                              } catch (err) {
+                                alert("Failed to reject order: " + err.message);
+                              }
+                            }}
+                            className="px-4 py-1.5 border border-red-200 text-[#E4002B] hover:bg-red-50 text-[10px] font-black uppercase rounded-full transition-colors"
+                          >
+                            Reject ✕
+                          </button>
+                          <button
+                            onClick={() => handleApproveStockOrder(order.id)}
+                            className="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase rounded-full transition-colors"
+                          >
+                            Verify & Dispatch ✓
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Validation Desk: Daily Reports */}
+              <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-4">
+                <h3 className="text-xs font-black uppercase text-black border-b border-gray-100 pb-3 tracking-wider">
+                  📊 Daily Reports Audit & Approval Desk
+                </h3>
+                {dailyReports.filter(r => r.status === 'Pending').length === 0 ? (
+                  <p className="text-xs text-gray-400 font-bold py-6 text-center">No pending daily reports require audit approval.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {dailyReports.filter(r => r.status === 'Pending').map(rep => (
+                      <div key={rep.id} className="p-4 bg-neutral-50 rounded-xl border border-gray-200/50 flex flex-col justify-between gap-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-xs font-black text-black">{rep.storeName}</span>
+                            <span className="text-[10px] text-gray-400 block mt-0.5">Submitted by {rep.submittedBy} on {new Date(rep.submittedAt).toLocaleTimeString()}</span>
+                          </div>
+                          <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded uppercase font-black">
+                            Date: {rep.date}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 py-2 text-center bg-white rounded border border-gray-100">
+                          <div className="p-1">
+                            <span className="text-[8px] font-black text-gray-400 uppercase block">Sales</span>
+                            <span className="text-xs font-extrabold text-emerald-600">₹{rep.totalSales.toLocaleString()}</span>
+                          </div>
+                          <div className="p-1">
+                            <span className="text-[8px] font-black text-gray-400 uppercase block">Expenses</span>
+                            <span className="text-xs font-extrabold text-[#E4002B]">₹{rep.totalExpenses.toLocaleString()}</span>
+                          </div>
+                          <div className="p-1">
+                            <span className="text-[8px] font-black text-gray-400 uppercase block">Waste</span>
+                            <span className="text-xs font-extrabold text-orange-600">₹{rep.totalWaste.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-1 justify-end">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const db = await apiAdminFetchDb();
+                                const updatedReports = db.daily_reports.map(r => {
+                                  if (r.id === rep.id) return { ...r, status: 'Rejected' };
+                                  return r;
+                                });
+                                await apiAdminPushDb({ daily_reports: updatedReports });
+                                setDailyReports(updatedReports);
+                                alert("Daily report rejected.");
+                              } catch (err) {
+                                alert("Failed to reject report: " + err.message);
+                              }
+                            }}
+                            className="px-4 py-1.5 border border-red-200 text-[#E4002B] hover:bg-red-50 text-[10px] font-black uppercase rounded-full transition-colors"
+                          >
+                            Reject ✕
+                          </button>
+                          <button
+                            onClick={() => handleApproveReport(rep.id)}
+                            className="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase rounded-full transition-colors"
+                          >
+                            Verify & Approve ✓
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+
           </section>
         )}
       </main>
