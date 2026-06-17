@@ -38,11 +38,19 @@ export async function POST(request) {
 
     // Merge updates
     const updated = {
+      ...current,
       users: body.users !== undefined ? body.users : current.users,
       stores: body.stores !== undefined ? body.stores : current.stores,
       menu_items: body.menu_items !== undefined ? body.menu_items : current.menu_items,
       active_orders: body.active_orders !== undefined ? body.active_orders : current.active_orders,
-      completed_orders: body.completed_orders !== undefined ? body.completed_orders : current.completed_orders
+      completed_orders: body.completed_orders !== undefined ? body.completed_orders : current.completed_orders,
+      expenses: body.expenses !== undefined ? body.expenses : current.expenses,
+      shifts: body.shifts !== undefined ? body.shifts : current.shifts,
+      waste_log: body.waste_log !== undefined ? body.waste_log : current.waste_log,
+      stock_items: body.stock_items !== undefined ? body.stock_items : current.stock_items,
+      staff_rota: body.staff_rota !== undefined ? body.staff_rota : current.staff_rota,
+      stock_orders: body.stock_orders !== undefined ? body.stock_orders : current.stock_orders,
+      daily_reports: body.daily_reports !== undefined ? body.daily_reports : current.daily_reports
     };
 
     saveDb(updated);

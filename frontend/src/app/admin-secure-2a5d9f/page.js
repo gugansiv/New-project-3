@@ -70,6 +70,16 @@ export default function AdminPortal() {
   const [stockItems, setStockItems] = useState([]);
   const [opsSelectedStoreId, setOpsSelectedStoreId] = useState('');
 
+  // Editing report states
+  const [editingReportId, setEditingReportId] = useState(null);
+  const [editReportSales, setEditReportSales] = useState('');
+  const [editReportExpenses, setEditReportExpenses] = useState('');
+  const [editReportWaste, setEditReportWaste] = useState('');
+
+  // Admin stock adjust states
+  const [adminAdjustingStockId, setAdminAdjustingStockId] = useState(null);
+  const [adminAdjustedStockQty, setAdminAdjustedStockQty] = useState('');
+
   // Fetch full Admin DB (reports and stock orders)
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'admin') return;
@@ -98,16 +108,91 @@ export default function AdminPortal() {
     return () => clearInterval(interval);
   }, [currentUser, opsSelectedStoreId]);
 
-  const handleApproveReport = async (reportId) => {
+  const handleStartEditReport = (rep) => {
+    setEditingReportId(rep.id);
+    setEditReportSales(rep.totalSales.toString());
+    setEditReportExpenses(rep.totalExpenses.toString());
+    setEditReportWaste(rep.totalWaste.toString());
+  };
+
+  const handleSaveEditedReport = async (reportId) => {
     try {
       const db = await apiAdminFetchDb();
       const updatedReports = db.daily_reports.map(r => {
-        if (r.id === reportId) return { ...r, status: 'Approved' };
+        if (r.id === reportId) {
+          return {
+            ...r,
+            totalSales: parseFloat(editReportSales || 0),
+            totalExpenses: parseFloat(editReportExpenses || 0),
+            totalWaste: parseFloat(editReportWaste || 0)
+          };
+        }
         return r;
       });
       await apiAdminPushDb({ daily_reports: updatedReports });
       setDailyReports(updatedReports);
-      alert("Daily report approved!");
+      setEditingReportId(null);
+      alert("Report changes saved locally! Verify and Approve to apply to store financials.");
+    } catch (err) {
+      alert("Failed to edit report: " + err.message);
+    }
+  };
+
+  const handleAdminAdjustStock = async (stockId, storeId, newQty) => {
+    try {
+      const db = await apiAdminFetchDb();
+      const updatedStock = db.stock_items.map(item => {
+        if (item.id === stockId && item.storeId === storeId) {
+          return { ...item, currentQty: parseFloat(newQty || 0) };
+        }
+        return item;
+      });
+      await apiAdminPushDb({ stock_items: updatedStock });
+      setStockItems(updatedStock);
+      setAdminAdjustingStockId(null);
+      alert("Stock count adjusted successfully! Changes will sync to the store outlet.");
+    } catch (err) {
+      alert("Failed to adjust stock: " + err.message);
+    }
+  };
+
+  const handleApproveReport = async (reportId) => {
+    try {
+      const db = await apiAdminFetchDb();
+      const report = db.daily_reports.find(r => r.id === reportId);
+      if (!report) return;
+
+      const updatedReports = db.daily_reports.map(r => {
+        if (r.id === reportId) return { ...r, status: 'Approved' };
+        return r;
+      });
+
+      // Adjust the store's historicalRevenue by the difference between the approved sales in this report
+      // and the actual orders completed for this store
+      const storeId = report.storeId;
+      const todaySalesInOrders = db.completed_orders
+        .filter(o => o.storeId === storeId && o.timestamp.startsWith(report.date))
+        .reduce((sum, o) => sum + o.total, 0);
+
+      const adjustment = report.totalSales - todaySalesInOrders;
+
+      const updatedStores = db.stores.map(s => {
+        if (s.id === storeId) {
+          return {
+            ...s,
+            historicalRevenue: Math.max(0, (s.historicalRevenue || 0) + adjustment)
+          };
+        }
+        return s;
+      });
+
+      await apiAdminPushDb({ 
+        daily_reports: updatedReports,
+        stores: updatedStores
+      });
+      setDailyReports(updatedReports);
+      setStores(updatedStores);
+      alert("Daily report approved! Store financial sales totals synchronized.");
     } catch (err) {
       alert("Failed to approve report: " + err.message);
     }
@@ -1858,7 +1943,6 @@ export default function AdminPortal() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        
                         {/* Stock Inventory Audit */}
                         <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
                           <h4 className="text-xs font-black uppercase text-black border-b border-gray-100 pb-2.5 tracking-wider">
@@ -1871,15 +1955,49 @@ export default function AdminPortal() {
                               {selStock.map(item => {
                                 const isLow = item.currentQty <= item.minQty;
                                 return (
-                                  <div key={item.id} className="flex justify-between items-center text-xs font-bold text-gray-700">
+                                  <div key={item.id} className="flex justify-between items-center text-xs font-bold text-gray-700 py-1.5 border-b border-gray-100 last:border-0">
                                     <span>{item.itemName}</span>
                                     <div className="flex items-center gap-2">
-                                      <span className="text-black font-extrabold">{item.currentQty} / {item.minQty} {item.unit}</span>
-                                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
-                                        isLow ? 'bg-red-50 text-[#E4002B] border border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                      }`}>
-                                        {isLow ? 'Low' : 'OK'}
-                                      </span>
+                                      {adminAdjustingStockId === item.id ? (
+                                        <div className="flex gap-1 items-center">
+                                          <input
+                                            type="number"
+                                            className="w-16 bg-white border border-gray-300 rounded px-1.5 py-0.5 text-[11px] text-black font-bold focus:outline-none"
+                                            value={adminAdjustedStockQty}
+                                            onChange={(e) => setAdminAdjustedStockQty(e.target.value)}
+                                          />
+                                          <button
+                                            onClick={() => handleAdminAdjustStock(item.id, opsSelectedStoreId, adminAdjustedStockQty)}
+                                            className="px-2 py-0.5 bg-emerald-600 text-white text-[9px] font-black rounded uppercase"
+                                          >
+                                            ✓
+                                          </button>
+                                          <button
+                                            onClick={() => setAdminAdjustingStockId(null)}
+                                            className="px-2 py-0.5 bg-gray-200 text-gray-700 text-[9px] font-black rounded uppercase"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <span className="text-black font-extrabold">{item.currentQty} / {item.minQty} {item.unit}</span>
+                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
+                                            isLow ? 'bg-red-50 text-[#E4002B] border border-red-200 animate-pulse' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                          }`}>
+                                            {isLow ? 'Low' : 'OK'}
+                                          </span>
+                                          <button
+                                            onClick={() => {
+                                              setAdminAdjustingStockId(item.id);
+                                              setAdminAdjustedStockQty(item.currentQty.toString());
+                                            }}
+                                            className="text-blue-600 hover:text-blue-800 text-[9px] uppercase font-black ml-1.5"
+                                          >
+                                            Adjust ✏️
+                                          </button>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -2041,7 +2159,7 @@ export default function AdminPortal() {
                 ) : (
                   <div className="space-y-4">
                     {dailyReports.filter(r => r.status === 'Pending').map(rep => (
-                      <div key={rep.id} className="p-4 bg-neutral-50 rounded-xl border border-gray-200/50 flex flex-col justify-between gap-3">
+                      <div key={rep.id} className="p-4 bg-neutral-50 rounded-xl border border-gray-200/50 flex flex-col justify-between gap-3 animate-scale-in">
                         <div className="flex justify-between items-start">
                           <div>
                             <span className="text-xs font-black text-black">{rep.storeName}</span>
@@ -2051,53 +2169,165 @@ export default function AdminPortal() {
                             Date: {rep.date}
                           </span>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 py-2 text-center bg-white rounded border border-gray-100">
-                          <div className="p-1">
-                            <span className="text-[8px] font-black text-gray-400 uppercase block">Sales</span>
-                            <span className="text-xs font-extrabold text-emerald-600">₹{rep.totalSales.toLocaleString()}</span>
+                        
+                        {editingReportId === rep.id ? (
+                          <div className="space-y-3 p-3 bg-white rounded border border-gray-200">
+                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">Edit Report Audit Details</span>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="block text-[8px] font-black text-gray-400 uppercase mb-1">Sales (₹)</label>
+                                <input
+                                  type="number"
+                                  className="w-full bg-white border border-gray-300 rounded px-1.5 py-1 text-xs text-black font-bold focus:outline-none"
+                                  value={editReportSales}
+                                  onChange={(e) => setEditReportSales(e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[8px] font-black text-gray-400 uppercase mb-1">Expenses (₹)</label>
+                                <input
+                                  type="number"
+                                  className="w-full bg-white border border-gray-300 rounded px-1.5 py-1 text-xs text-black font-bold focus:outline-none"
+                                  value={editReportExpenses}
+                                  onChange={(e) => setEditReportExpenses(e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[8px] font-black text-gray-400 uppercase mb-1">Waste (₹)</label>
+                                <input
+                                  type="number"
+                                  className="w-full bg-white border border-gray-300 rounded px-1.5 py-1 text-xs text-black font-bold focus:outline-none"
+                                  value={editReportWaste}
+                                  onChange={(e) => setEditReportWaste(e.target.value)}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2 justify-end pt-1">
+                              <button
+                                onClick={() => setEditingReportId(null)}
+                                className="px-3 py-1 bg-gray-100 text-gray-700 text-[9px] font-black uppercase rounded"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => handleSaveEditedReport(rep.id)}
+                                className="px-3 py-1 bg-emerald-600 text-white text-[9px] font-black uppercase rounded"
+                              >
+                                Save Changes
+                              </button>
+                            </div>
                           </div>
-                          <div className="p-1">
-                            <span className="text-[8px] font-black text-gray-400 uppercase block">Expenses</span>
-                            <span className="text-xs font-extrabold text-[#E4002B]">₹{rep.totalExpenses.toLocaleString()}</span>
-                          </div>
-                          <div className="p-1">
-                            <span className="text-[8px] font-black text-gray-400 uppercase block">Waste</span>
-                            <span className="text-xs font-extrabold text-orange-600">₹{rep.totalWaste.toLocaleString()}</span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 pt-1 justify-end">
-                          <button
-                            onClick={async () => {
-                              try {
-                                const db = await apiAdminFetchDb();
-                                const updatedReports = db.daily_reports.map(r => {
-                                  if (r.id === rep.id) return { ...r, status: 'Rejected' };
-                                  return r;
-                                });
-                                await apiAdminPushDb({ daily_reports: updatedReports });
-                                setDailyReports(updatedReports);
-                                alert("Daily report rejected.");
-                              } catch (err) {
-                                alert("Failed to reject report: " + err.message);
-                              }
-                            }}
-                            className="px-4 py-1.5 border border-red-200 text-[#E4002B] hover:bg-red-50 text-[10px] font-black uppercase rounded-full transition-colors"
-                          >
-                            Reject ✕
-                          </button>
-                          <button
-                            onClick={() => handleApproveReport(rep.id)}
-                            className="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase rounded-full transition-colors"
-                          >
-                            Verify & Approve ✓
-                          </button>
-                        </div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-3 gap-2 py-2 text-center bg-white rounded border border-gray-100">
+                              <div className="p-1">
+                                <span className="text-[8px] font-black text-gray-400 uppercase block">Sales</span>
+                                <span className="text-xs font-extrabold text-emerald-600">₹{rep.totalSales.toLocaleString()}</span>
+                              </div>
+                              <div className="p-1">
+                                <span className="text-[8px] font-black text-gray-400 uppercase block">Expenses</span>
+                                <span className="text-xs font-extrabold text-[#E4002B]">₹{rep.totalExpenses.toLocaleString()}</span>
+                              </div>
+                              <div className="p-1">
+                                <span className="text-[8px] font-black text-gray-400 uppercase block">Waste</span>
+                                <span className="text-xs font-extrabold text-orange-600">₹{rep.totalWaste.toLocaleString()}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 pt-1 justify-end items-center">
+                              <button
+                                onClick={() => handleStartEditReport(rep)}
+                                className="text-blue-600 hover:text-blue-800 text-[10px] uppercase font-black mr-auto"
+                              >
+                                Edit Report ✏️
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const db = await apiAdminFetchDb();
+                                    const updatedReports = db.daily_reports.map(r => {
+                                      if (r.id === rep.id) return { ...r, status: 'Rejected' };
+                                      return r;
+                                    });
+                                    await apiAdminPushDb({ daily_reports: updatedReports });
+                                    setDailyReports(updatedReports);
+                                    alert("Daily report rejected.");
+                                  } catch (err) {
+                                    alert("Failed to reject report: " + err.message);
+                                  }
+                                }}
+                                className="px-4 py-1.5 border border-red-200 text-[#E4002B] hover:bg-red-50 text-[10px] font-black uppercase rounded-full transition-colors"
+                              >
+                                Reject ✕
+                              </button>
+                              <button
+                                onClick={() => handleApproveReport(rep.id)}
+                                className="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase rounded-full transition-colors"
+                              >
+                                Verify & Approve ✓
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
+            </div>
+
+            {/* 4. Daily Reports Historical Audit Archive Ledger (Approved / Rejected) */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mt-8 animate-scale-in">
+              <div className="bg-gray-50 border-b border-gray-200 p-4 flex justify-between items-center">
+                <h3 className="text-xs font-black uppercase text-black font-sans">📁 Historical Daily Reports Audit Archive Ledger</h3>
+                <span className="text-[10px] font-black text-gray-500 uppercase">Archived records: {dailyReports.filter(r => r.status === 'Approved' || r.status === 'Rejected').length}</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead>
+                    <tr className="bg-neutral-50 text-gray-500 border-b border-gray-200 uppercase font-black">
+                      <th className="p-3">Store Name</th>
+                      <th className="p-3">Report Date</th>
+                      <th className="p-3 text-right">Gross Sales</th>
+                      <th className="p-3 text-right">Expenses</th>
+                      <th className="p-3 text-right">Waste</th>
+                      <th className="p-3 text-center">Alerts (Staff / Stock)</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Verified By</th>
+                      <th className="p-3 text-right">Approved Time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-bold text-gray-600">
+                    {dailyReports.filter(r => r.status === 'Approved' || r.status === 'Rejected').length === 0 ? (
+                      <tr>
+                        <td colSpan="9" className="p-6 text-center text-gray-400 font-bold">No archived daily reports found. Completed audits will appear here for record maintenance.</td>
+                      </tr>
+                    ) : (
+                      dailyReports.filter(r => r.status === 'Approved' || r.status === 'Rejected').map(rep => (
+                        <tr key={rep.id} className="hover:bg-neutral-50/50">
+                          <td className="p-3 text-black font-extrabold">{rep.storeName}</td>
+                          <td className="p-3">{rep.date}</td>
+                          <td className="p-3 text-right text-emerald-600">₹{rep.totalSales.toFixed(2)}</td>
+                          <td className="p-3 text-right text-[#E4002B]">-₹{rep.totalExpenses.toFixed(2)}</td>
+                          <td className="p-3 text-right text-orange-600">-₹{rep.totalWaste.toFixed(2)}</td>
+                          <td className="p-3 text-center">
+                            {rep.activeShiftsCount} shifts / {rep.stockAlertsCount} alerts
+                          </td>
+                          <td className="p-3">
+                            <span className={`text-[8px] font-black px-2 py-0.5 rounded border uppercase ${
+                              rep.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-[#E4002B] border-red-200'
+                            }`}>
+                              {rep.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-gray-500">{rep.submittedBy}</td>
+                          <td className="p-3 text-right text-gray-400 text-[10px]">{new Date(rep.submittedAt).toLocaleDateString()} {new Date(rep.submittedAt).toLocaleTimeString()}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
           </section>
