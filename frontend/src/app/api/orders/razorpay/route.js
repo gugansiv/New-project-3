@@ -8,10 +8,6 @@ function getAuthUser(request) {
 }
 
 export async function POST(request) {
-  const user = getAuthUser(request);
-  if (!user) {
-    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
-  }
 
   try {
     const body = await request.json();

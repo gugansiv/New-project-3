@@ -44,9 +44,6 @@ export async function GET(request) {
 // POST /api/orders - Place a new order (any authenticated user)
 export async function POST(request) {
   const user = getAuthUser(request);
-  if (!user) {
-    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
-  }
 
   try {
     const body = await request.json();
@@ -109,8 +106,8 @@ export async function POST(request) {
       timestamp: new Date().toISOString(),
       paymentMethod: paymentMethod || 'Card',
       paymentId: paymentId || null,
-      customerName: customerName || user.name,
-      customerEmail: user.email
+      customerName: customerName || (user ? user.name : 'Guest'),
+      customerEmail: user ? user.email : 'guest@crispy.com'
     };
 
     const updatedActiveOrders = [...(db.active_orders || []), newOrder];
