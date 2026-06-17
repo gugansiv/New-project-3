@@ -1,0 +1,46 @@
+
+> system-dashboard-backend@1.0.0 start
+> node index.js
+
+{"level":30,"time":1781641213171,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Fetching cybersecurity news from RSS feed..."}
+{"level":30,"time":1781641213211,"pid":2786,"hostname":"PRIME-AIR.local","msg":"PostgreSQL tables checked/created successfully."}
+{"level":30,"time":1781641213217,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Qdrant collection \"system_docs\" already exists."}
+Connecting to MCP server [filesystem] via command: npx -y @modelcontextprotocol/server-filesystem /Volumes/PRIME DATA/Workspace
+{"level":30,"time":1781641213517,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Successfully collected and saved 50 cybersecurity news stories to Nova."}
+Secure MCP Filesystem Server running on stdio
+Client does not support MCP Roots, using allowed directories set from server args: [ '/Volumes/PRIME DATA/Workspace' ]
+Successfully registered 14 tools from MCP server [filesystem]
+{"level":30,"time":1781641214039,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Server listening at http://0.0.0.0:3001"}
+{"level":30,"time":1781641243172,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Fetching cybersecurity news from RSS feed..."}
+{"level":30,"time":1781641243744,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Successfully collected and saved 50 cybersecurity news stories to Nova."}
+{"level":30,"time":1781641250111,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-1","req":{"method":"GET","url":"/api/status","hostname":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49385},"msg":"incoming request"}
+{"level":30,"time":1781641250123,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-1","res":{"statusCode":200},"responseTime":11.857749999966472,"msg":"request completed"}
+{"level":30,"time":1781641252069,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-2","req":{"method":"GET","url":"/api/history","hostname":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49392},"msg":"incoming request"}
+{"level":30,"time":1781641252071,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-2","res":{"statusCode":200},"responseTime":2.0055419999407604,"msg":"request completed"}
+{"level":30,"time":1781641253418,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-3","req":{"method":"GET","url":"/api/agents","hostname":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49394},"msg":"incoming request"}
+{"level":30,"time":1781641253419,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-3","res":{"statusCode":200},"responseTime":1.5091659999452531,"msg":"request completed"}
+{"level":30,"time":1781641255210,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-4","req":{"method":"GET","url":"/api/news","hostname":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49396},"msg":"incoming request"}
+{"level":30,"time":1781641255210,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-4","res":{"statusCode":200},"responseTime":0.6844159999163821,"msg":"request completed"}
+{"level":30,"time":1781641259444,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-5","req":{"method":"POST","url":"/api/chat","hostname":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49398},"msg":"incoming request"}
+{"level":30,"time":1781641270756,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-5","res":{"statusCode":200},"responseTime":11311.061624999973,"msg":"request completed"}
+{"level":30,"time":1781641273173,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Fetching cybersecurity news from RSS feed..."}
+{"level":30,"time":1781641273575,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Successfully collected and saved 50 cybersecurity news stories to Nova."}
+{"level":30,"time":1781641283602,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-6","req":{"method":"POST","url":"/api/chat","hostname":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":49439},"msg":"incoming request"}
+{"level":30,"time":1781641303189,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Fetching cybersecurity news from RSS feed..."}
+{"level":30,"time":1781641303778,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Successfully collected and saved 50 cybersecurity news stories to Nova."}
+{"level":30,"time":1781641319117,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-6","res":{"statusCode":200},"responseTime":35511.77033299999,"msg":"request completed"}
+{"level":30,"time":1781641331619,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-7","req":{"method":"POST","url":"/api/index","hostname":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":51367},"msg":"incoming request"}
+{"level":30,"time":1781641334989,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Fetching cybersecurity news from RSS feed..."}
+{"level":30,"time":1781641336009,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-7","res":{"statusCode":200},"responseTime":4375.237833000021,"msg":"request completed"}
+{"level":30,"time":1781641336257,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Successfully collected and saved 50 cybersecurity news stories to Nova."}
+{"level":30,"time":1781641343863,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-8","req":{"method":"GET","url":"/api/history","hostname":"localhost:3001","remoteAddress":"127.0.0.1","remotePort":51942},"msg":"incoming request"}
+{"level":30,"time":1781641348683,"pid":2786,"hostname":"PRIME-AIR.local","reqId":"req-8","res":{"statusCode":200},"responseTime":4792.632834000047,"msg":"request completed"}
+{"level":30,"time":1781641365713,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Fetching cybersecurity news from RSS feed..."}
+{"level":30,"time":1781641389261,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Successfully collected and saved 50 cybersecurity news stories to Nova."}
+{"level":30,"time":1781641395841,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Fetching cybersecurity news from RSS feed..."}
+{"level":30,"time":1781641403349,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Successfully collected and saved 50 cybersecurity news stories to Nova."}
+{"level":30,"time":1781641426175,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Fetching cybersecurity news from RSS feed..."}
+{"level":30,"time":1781641451398,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Successfully collected and saved 50 cybersecurity news stories to Nova."}
+{"level":30,"time":1781641455939,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Fetching cybersecurity news from RSS feed..."}
+{"level":30,"time":1781641457408,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Successfully collected and saved 50 cybersecurity news stories to Nova."}
+{"level":30,"time":1781641486807,"pid":2786,"hostname":"PRIME-AIR.local","msg":"Fetching cybersecurity news from RSS feed..."}

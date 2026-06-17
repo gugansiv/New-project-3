@@ -1,0 +1,343 @@
+{
+  "users": [
+    {
+      "id": "usr-admin",
+      "name": "Global Admin",
+      "email": "admin@crispy.com",
+      "password": "admin123",
+      "role": "admin",
+      "storeId": null
+    },
+    {
+      "id": "usr-customer",
+      "name": "John Doe",
+      "email": "customer@crispy.com",
+      "password": "customer123",
+      "role": "customer",
+      "storeId": null
+    },
+    {
+      "id": "usr-5160",
+      "name": "made",
+      "email": "made@gmail.com",
+      "password": "made",
+      "role": "customer",
+      "storeId": null
+    }
+  ],
+  "stores": [
+    {
+      "id": "st1",
+      "name": "Downtown Flagship",
+      "address": "742 Broadway, New York, NY",
+      "manager": "Marcus Vance",
+      "status": "Open",
+      "rent": 250000,
+      "staffCount": 18,
+      "dailyTarget": 120000,
+      "historicalRevenue": 4245000,
+      "historicalOrders": 4150
+    },
+    {
+      "id": "st2",
+      "name": "Westside Drive-Thru",
+      "address": "1450 10th Ave, New York, NY",
+      "manager": "Sarah Jenkins",
+      "status": "Open",
+      "rent": 180000,
+      "staffCount": 14,
+      "dailyTarget": 95000,
+      "historicalRevenue": 3345000,
+      "historicalOrders": 3270
+    },
+    {
+      "id": "st3",
+      "name": "Eastside Express",
+      "address": "330 E 23rd St, New York, NY",
+      "manager": "Li Wei Chen",
+      "status": "Open",
+      "rent": 120000,
+      "staffCount": 8,
+      "dailyTarget": 60000,
+      "historicalRevenue": 1925000,
+      "historicalOrders": 1880
+    },
+    {
+      "id": "st4",
+      "name": "Uptown Mall Court",
+      "address": "2200 Grand Concourse, Bronx, NY",
+      "manager": "Elena Rostova",
+      "status": "Closed",
+      "rent": 150000,
+      "staffCount": 10,
+      "dailyTarget": 75000,
+      "historicalRevenue": 2425000,
+      "historicalOrders": 2370
+    }
+  ],
+  "menu_items": [
+    {
+      "id": "b1",
+      "name": "10 Pcs Crispy Chicken Bucket",
+      "category": "Buckets",
+      "price": 899,
+      "calories": 2450,
+      "type": "non-veg",
+      "description": "10 pieces of our signature hot & crispy bone-in chicken. Perfect for sharing!",
+      "image": "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "b2",
+      "name": "6 Pcs Variety Bucket",
+      "category": "Buckets",
+      "price": 599,
+      "calories": 1580,
+      "type": "non-veg",
+      "description": "6 pieces of hot & crispy chicken, plus 4 chicken tenders and 2 dipping sauces.",
+      "image": "https://images.unsplash.com/photo-1569058242253-92a9c755a0ec?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "b3",
+      "name": "Tender Feast Bucket",
+      "category": "Buckets",
+      "price": 699,
+      "calories": 1820,
+      "type": "non-veg",
+      "description": "12 crispy golden boneless chicken tenders, large fries, large coleslaw, and 3 sauces.",
+      "image": "https://images.unsplash.com/photo-1562967914-608f82629710?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "bg1",
+      "name": "Mega Crunch Burger",
+      "category": "Burgers & Wraps",
+      "price": 279,
+      "calories": 720,
+      "type": "non-veg",
+      "description": "Double crispy spicy chicken breast fillet, cheese, lettuce, spicy mayo, toasted sesame bun.",
+      "image": "https://images.unsplash.com/photo-1625813506062-0aeb1d7a094b?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "bg2",
+      "name": "Classic Chicken Crunch",
+      "category": "Burgers & Wraps",
+      "price": 199,
+      "calories": 580,
+      "type": "non-veg",
+      "description": "Crispy golden chicken fillet, creamy mayonnaise, pickles, shredded lettuce, toasted bun.",
+      "image": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "bg3",
+      "name": "Spicy Crispy Wrap",
+      "category": "Burgers & Wraps",
+      "price": 219,
+      "calories": 490,
+      "type": "non-veg",
+      "description": "Two crispy chicken tenders, lettuce, diced tomatoes, pepper mayo, warm tortilla wrap.",
+      "image": "https://images.unsplash.com/photo-1626700051175-6518c4793fdf?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "s1",
+      "name": "Crispy Crinkle Fries",
+      "category": "Sides",
+      "price": 119,
+      "calories": 380,
+      "type": "veg",
+      "description": "Golden crinkle-cut fries seasoned with our special spice blend.",
+      "image": "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "s2",
+      "name": "Creamy Coleslaw",
+      "category": "Sides",
+      "price": 99,
+      "calories": 140,
+      "type": "veg",
+      "description": "Freshly shredded cabbage and carrots in our signature sweet creamy dressing.",
+      "image": "https://images.unsplash.com/photo-1625944525734-53c3f9166f0d?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "s3",
+      "name": "Hot Spicy Wings (6 Pcs)",
+      "category": "Sides",
+      "price": 239,
+      "calories": 480,
+      "type": "non-veg",
+      "description": "6 crispy bone-in chicken wings tossed in fiery chili seasoning.",
+      "image": "https://images.unsplash.com/photo-1567620832903-9fc6debc209f?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "s4",
+      "name": "Whipped Potatoes & Gravy",
+      "category": "Sides",
+      "price": 119,
+      "calories": 190,
+      "type": "non-veg",
+      "description": "Creamy mashed potatoes topped with our signature savory chicken gravy.",
+      "image": "https://images.unsplash.com/photo-1514516345957-556ca7d90a29?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "d1",
+      "name": "Pepsi Cola",
+      "category": "Drinks",
+      "price": 69,
+      "calories": 150,
+      "type": "veg",
+      "description": "Ice cold Pepsi. The perfect companion for your chicken feast.",
+      "image": "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "d2",
+      "name": "Mountain Dew",
+      "category": "Drinks",
+      "price": 69,
+      "calories": 170,
+      "type": "veg",
+      "description": "Refreshing citrus blast soda served over crushed ice.",
+      "image": "https://images.unsplash.com/photo-1625772291427-39f85d174d53?w=600&auto=format&fit=crop&q=60"
+    },
+    {
+      "id": "d3",
+      "name": "Iced Lemon Tea",
+      "category": "Drinks",
+      "price": 89,
+      "calories": 90,
+      "type": "veg",
+      "description": "Brewed black tea with a splash of lemon juice and honey.",
+      "image": "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=600&auto=format&fit=crop&q=60"
+    }
+  ],
+  "active_orders": [],
+  "completed_orders": [
+    {
+      "id": "ord-9941",
+      "storeId": "st1",
+      "storeName": "Downtown Flagship",
+      "items": [
+        {
+          "id": "b1",
+          "name": "10 Pcs Crispy Chicken Bucket",
+          "quantity": 1,
+          "price": 899
+        },
+        {
+          "id": "d1",
+          "name": "Pepsi Cola",
+          "quantity": 2,
+          "price": 69
+        }
+      ],
+      "subtotal": 1037,
+      "tax": 82.96,
+      "total": 1119.96,
+      "status": "Completed",
+      "timestamp": "2026-06-16T18:30:00Z",
+      "paymentMethod": "Card",
+      "customerName": "John Doe"
+    },
+    {
+      "id": "ord-9942",
+      "storeId": "st2",
+      "storeName": "Westside Drive-Thru",
+      "items": [
+        {
+          "id": "bg1",
+          "name": "Mega Crunch Burger",
+          "quantity": 2,
+          "price": 279
+        },
+        {
+          "id": "s1",
+          "name": "Crispy Crinkle Fries",
+          "quantity": 2,
+          "price": 119
+        }
+      ],
+      "subtotal": 796,
+      "tax": 63.68,
+      "total": 859.68,
+      "status": "Completed",
+      "timestamp": "2026-06-16T19:15:00Z",
+      "paymentMethod": "Apple Pay",
+      "customerName": "Sarah Connor"
+    },
+    {
+      "id": "ord-9943",
+      "storeId": "st1",
+      "storeName": "Downtown Flagship",
+      "items": [
+        {
+          "id": "b2",
+          "name": "6 Pcs Variety Bucket",
+          "quantity": 1,
+          "price": 599
+        },
+        {
+          "id": "s2",
+          "name": "Creamy Coleslaw",
+          "quantity": 1,
+          "price": 99
+        }
+      ],
+      "subtotal": 698,
+      "tax": 55.84,
+      "total": 753.84,
+      "status": "Completed",
+      "timestamp": "2026-06-16T19:40:00Z",
+      "paymentMethod": "Cash",
+      "customerName": "Mike Myers"
+    },
+    {
+      "id": "ord-9944",
+      "storeId": "st3",
+      "storeName": "Eastside Express",
+      "items": [
+        {
+          "id": "bg3",
+          "name": "Spicy Crispy Wrap",
+          "quantity": 1,
+          "price": 219
+        },
+        {
+          "id": "d3",
+          "name": "Iced Lemon Tea",
+          "quantity": 1,
+          "price": 89
+        }
+      ],
+      "subtotal": 308,
+      "tax": 24.64,
+      "total": 332.64,
+      "status": "Completed",
+      "timestamp": "2026-06-16T20:05:00Z",
+      "paymentMethod": "Card",
+      "customerName": "Emma Watson"
+    },
+    {
+      "id": "ord-9945",
+      "storeId": "st2",
+      "storeName": "Westside Drive-Thru",
+      "items": [
+        {
+          "id": "b1",
+          "name": "10 Pcs Crispy Chicken Bucket",
+          "quantity": 2,
+          "price": 899
+        },
+        {
+          "id": "s3",
+          "name": "Hot Spicy Wings (6 Pcs)",
+          "quantity": 1,
+          "price": 239
+        }
+      ],
+      "subtotal": 2037,
+      "tax": 162.96,
+      "total": 2199.96,
+      "status": "Completed",
+      "timestamp": "2026-06-16T20:55:00Z",
+      "paymentMethod": "Card",
+      "customerName": "David Beckham"
+    }
+  ]
+}
