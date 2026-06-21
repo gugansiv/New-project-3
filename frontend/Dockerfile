@@ -11,6 +11,7 @@ COPY . .
 
 # Build Next.js (standalone output for minimal image)
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV DOCKER=true
 RUN npm run build
 
 # ---- Production Stage ----
