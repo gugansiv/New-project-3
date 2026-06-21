@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Architecture — Full Layer Breakdown & Tech Stack</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --fire: #E8380D; --gold: #F5A623; --dark: #0D0D0F; --dark-2: #15151A; --dark-3: #1E1E24;
+    --mid: #34343C; --muted: #8A8A95; --text: #E4E4E8; --text-dim: #ABABB5;
+    --green: #22C55E; --amber: #F59E0B; --red: #EF4444; --blue: #3B82F6; --teal: #14B8A6; --purple: #A855F7;
+    --border: rgba(255,255,255,0.08);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background: var(--dark); color: var(--text); font-family:'Inter',sans-serif; font-size:15px; line-height:1.65; }
+
+  .hero { background: var(--dark-2); border-bottom:1px solid var(--border); padding:50px 40px 42px; position:relative; overflow:hidden; }
+  .hero::before { content:''; position:absolute; top:-80px; right:-100px; width:460px; height:460px; background: radial-gradient(circle, rgba(232,56,13,0.16) 0%, transparent 70%); }
+  .hero-tag { display:inline-block; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; color:var(--fire); text-transform:uppercase; border:1px solid var(--fire); padding:4px 10px; border-radius:3px; margin-bottom:18px; }
+  .hero h1 { font-family:'Syne',sans-serif; font-size:clamp(24px,4vw,40px); font-weight:800; color:#fff; max-width:800px; line-height:1.15; }
+  .hero h1 span { color:var(--fire); }
+  .hero-sub { margin-top:12px; color:var(--text-dim); font-size:13.5px; max-width:680px; }
+
+  .section { padding:40px 40px; border-bottom:1px solid var(--border); }
+  .section-label { font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.14em; color:var(--fire); text-transform:uppercase; margin-bottom:8px; }
+  .section-title { font-family:'Syne',sans-serif; font-size:21px; font-weight:700; color:#fff; margin-bottom:6px; }
+  .section-sub { font-size:13px; color:var(--text-dim); font-style:italic; margin-bottom:18px; }
+  .section-body { color:var(--text-dim); font-size:14px; line-height:1.75; }
+  .section-body p + p { margin-top:10px; }
+
+  /* layer badge header */
+  .layer-banner { display:flex; align-items:center; gap:14px; margin-bottom:22px; padding:16px 20px; border-radius:10px; }
+  .layer-banner.l1 { background:linear-gradient(135deg, rgba(59,130,246,0.15), rgba(59,130,246,0.04)); border:1px solid rgba(59,130,246,0.3); }
+  .layer-banner.l2 { background:linear-gradient(135deg, rgba(232,56,13,0.15), rgba(232,56,13,0.04)); border:1px solid rgba(232,56,13,0.3); }
+  .layer-banner.l3 { background:linear-gradient(135deg, rgba(34,197,94,0.15), rgba(34,197,94,0.04)); border:1px solid rgba(34,197,94,0.3); }
+  .layer-num { font-family:'Syne',sans-serif; font-size:30px; font-weight:800; color:#fff; opacity:0.9; }
+  .layer-banner-text .lb-title { font-family:'Syne',sans-serif; font-size:17px; font-weight:700; color:#fff; }
+  .layer-banner-text .lb-sub { font-size:12px; color:var(--text-dim); margin-top:2px; }
+
+  /* portal feature card */
+  .portal-block { background:var(--dark-3); border:1px solid var(--border); border-radius:10px; padding:22px; margin-bottom:18px; }
+  .portal-block-head { display:flex; align-items:center; gap:10px; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .portal-block-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .portal-block-title { font-family:'Syne',sans-serif; font-size:16px; font-weight:700; color:#fff; }
+  .portal-block-stack { margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--gold); }
+
+  .feat-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:14px; }
+  .feat-item { background: var(--dark); border:1px solid var(--mid); border-radius:8px; padding:14px 16px; }
+  .feat-item-title { font-size:13px; font-weight:600; color:#fff; margin-bottom:6px; font-family:'Syne',sans-serif; }
+  .feat-list { list-style:none; font-size:11.8px; color:var(--text-dim); line-height:1.7; }
+  .feat-list li { padding-left:13px; position:relative; margin-bottom:3px; }
+  .feat-list li::before { content:'–'; position:absolute; left:0; color:var(--muted); }
+
+  /* tech stack pills */
+  .tech-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+  .tech-pill { background:var(--dark); border:1px solid var(--mid); border-radius:20px; padding:5px 13px; font-size:11.5px; color:var(--text); font-family:'JetBrains Mono',monospace; }
+  .tech-pill.hl { border-color: var(--fire); color: var(--gold); }
+
+  /* tables */
+  .data-table { width:100%; border-collapse:collapse; margin-top:14px; font-size:12.5px; }
+  .data-table th { background:var(--dark-3); text-align:left; padding:9px 12px; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.06em; color:var(--muted); text-transform:uppercase; border-bottom:1px solid var(--border); }
+  .data-table td { padding:9px 12px; border-bottom:1px solid var(--border); color:var(--text-dim); vertical-align:top; }
+  .data-table tr:last-child td { border-bottom:none; }
+  .data-table td:first-child { color:var(--text); font-weight:500; }
+  .data-table code { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--teal); background:rgba(20,184,166,0.08); padding:1px 5px; border-radius:3px; }
+
+  .pill { display:inline-block; padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:500; font-family:'JetBrains Mono',monospace; }
+  .pill.green { background:rgba(34,197,94,0.15); color:var(--green); }
+  .pill.amber { background:rgba(245,158,11,0.15); color:var(--amber); }
+  .pill.red { background:rgba(239,68,68,0.15); color:var(--red); }
+  .pill.blue { background:rgba(59,130,246,0.15); color:var(--blue); }
+  .pill.purple { background:rgba(168,85,247,0.15); color:var(--purple); }
+
+  /* microservice card grid for layer 2 */
+  .service-grid { display:grid; grid-template-columns: repeat(2,1fr); gap:14px; margin-top:16px; }
+  .service-card { background:var(--dark-3); border:1px solid var(--border); border-radius:10px; padding:18px; }
+  .service-card-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+  .service-name { font-family:'Syne',sans-serif; font-size:14px; font-weight:700; color:#fff; }
+  .service-desc { font-size:12px; color:var(--text-dim); margin-bottom:10px; line-height:1.6; }
+  .service-endpoints { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted); line-height:1.8; background:var(--dark); border-radius:6px; padding:8px 10px; }
+  .service-endpoints .verb { color:var(--teal); }
+  .service-endpoints .verb.post { color: var(--gold); }
+  .service-endpoints .verb.put { color: var(--blue); }
+  .service-endpoints .verb.del { color: var(--red); }
+
+  /* DB layer */
+  .db-grid { display:grid; grid-template-columns: repeat(2,1fr); gap:14px; margin-top:16px; }
+  .db-card { background:var(--dark-3); border:1px solid var(--border); border-radius:10px; padding:18px; }
+  .db-card.audit { border-color: var(--red); background: linear-gradient(135deg, rgba(239,68,68,0.08), transparent); }
+  .db-card-title { font-family:'Syne',sans-serif; font-size:14px; font-weight:700; color:#fff; margin-bottom:6px; }
+  .db-card-eng { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--gold); margin-bottom:10px; }
+
+  .verdict { background: linear-gradient(135deg, rgba(232,56,13,0.12) 0%, rgba(245,166,35,0.08) 100%); border:1px solid rgba(232,56,13,0.3); border-radius:10px; padding:22px 26px; margin-top:18px; }
+  .verdict-label { font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; }
+  .verdict-text { font-family:'Syne',sans-serif; font-size:15px; font-weight:700; color:#fff; line-height:1.4; }
+  .verdict-sub { margin-top:8px; font-size:12.5px; color:var(--text-dim); line-height:1.7; }
+
+  .flow-diagram { background:var(--dark-3); border:1px solid var(--border); border-radius:10px; padding:20px; margin-top:16px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-dim); line-height:2.1; }
+  .flow-step { color:var(--text); }
+  .flow-arrow { color:var(--fire); margin:0 6px; }
+
+  .footer { padding:26px 40px; background:var(--dark-2); border-top:1px solid var(--border); font-size:11.5px; color:var(--muted); line-height:1.7; }
+
+  @media (max-width: 900px) {
+    .feat-grid, .service-grid, .db-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-tag">Engineering Specification · June 2026</div>
+  <h1>System Architecture — Full Layer Breakdown<br><span>For Your Development Team</span></h1>
+  <p class="hero-sub">Layer-by-layer detail: every feature, every microservice, every API endpoint pattern, and the exact technology stack — so this can go straight into a development brief or sprint backlog.</p>
+</div>
+
+<!-- ═══════════════════════════════════════ LAYER 1 ═══════════════════════════════════════ -->
+<div class="section">
+  <div class="layer-banner l1">
+    <div class="layer-num">01</div>
+    <div class="layer-banner-text">
+      <div class="lb-title">Presentation Layer — The Three Portals</div>
+      <div class="lb-sub">What customers, branch staff, and admins actually see and click on</div>
+    </div>
+  </div>
+
+  <p class="section-body">All three portals are separate front-end applications, but share one component library and one design system so they're fast to build and stay visually consistent. They all talk to the same backend API (Layer 2) — they're just different "views" into the same data, gated by role.</p>
+
+  <!-- Customer Portal -->
+  <div class="portal-block">
+    <div class="portal-block-head">
+      <span class="portal-block-dot" style="background:var(--teal);"></span>
+      <span class="portal-block-title">Customer Web Portal</span>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-item">
+        <div class="feat-item-title">Authentication & Account</div>
+        <ul class="feat-list">
+          <li>Signup via phone number + OTP (primary, since most users are on mobile)</li>
+          <li>Optional email/password as backup login</li>
+          <li>"Forgot password" flow via OTP, not email link (faster in India)</li>
+          <li>Social login (Google) — optional add-on</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Profile Management</div>
+        <ul class="feat-list">
+          <li>Name, phone, email, saved addresses</li>
+          <li>Order history with status (placed/preparing/ready/delivered)</li>
+          <li>Reorder button on past orders</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Loyalty Points Wallet</div>
+        <ul class="feat-list">
+          <li>Live points balance, always visible on dashboard</li>
+          <li>Points transaction history (earned/redeemed, per order)</li>
+          <li>Redeem points at checkout — auto-calculates discount</li>
+          <li>"Add to Apple/Google Wallet" button — generates wallet pass</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Ordering</div>
+        <ul class="feat-list">
+          <li>Menu browse with live price (pulled from Admin's pricing service)</li>
+          <li>Cart, checkout, online payment (UPI/cards via payment gateway)</li>
+          <li>Order tracking screen — live status updates</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Notification Preferences</div>
+        <ul class="feat-list">
+          <li>Opt-in/out toggle for WhatsApp, email, SMS separately</li>
+          <li>View past notifications (offer history)</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Support</div>
+        <ul class="feat-list">
+          <li>Raise an issue/complaint against an order</li>
+          <li>View ticket status (open/resolved) — visible to Support role on backend</li>
+        </ul>
+      </div>
+    </div>
+    <div class="tech-row">
+      <span class="tech-pill hl">React 18 + TypeScript</span>
+      <span class="tech-pill">Next.js (SSR for fast load + SEO)</span>
+      <span class="tech-pill">Tailwind CSS</span>
+      <span class="tech-pill">React Query (API caching)</span>
+      <span class="tech-pill">PWA-enabled (installable, works offline-lite)</span>
+    </div>
+  </div>
+
+  <!-- Branch Portal -->
+  <div class="portal-block">
+    <div class="portal-block-head">
+      <span class="portal-block-dot" style="background:var(--fire);"></span>
+      <span class="portal-block-title">Branch (Store) Portal</span>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-item">
+        <div class="feat-item-title">Order Management</div>
+        <ul class="feat-list">
+          <li>Live order queue — new / in-progress / ready / completed columns</li>
+          <li>Sound/visual alert on new order (real-time, not refresh-based)</li>
+          <li>Mark items out-of-stock instantly — reflects on customer menu</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Daily Financial Entry</div>
+        <ul class="feat-list">
+          <li>Cash drawer reconciliation (opening/closing cash count)</li>
+          <li>Manual expense entry (e.g. local supply purchase) with receipt photo upload</li>
+          <li>Daily sales summary auto-generated from orders, editable for corrections with reason log</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Stock & Inventory</div>
+        <ul class="feat-list">
+          <li>Current stock levels per item (chicken, cheese, buns, etc.)</li>
+          <li>Low-stock alerts (auto-flag below threshold)</li>
+          <li>Submit restock request → goes to Regional Manager/Admin for approval</li>
+          <li>Record stock received against supplier delivery</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Issue Reporting</div>
+        <ul class="feat-list">
+          <li>Log equipment faults, customer complaints, safety issues</li>
+          <li>Photo attachment, severity tag, auto-routes to Admin/Support</li>
+          <li>Track resolution status</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Employee Records (for Payroll Input)</div>
+        <ul class="feat-list">
+          <li>Staff list for this branch — shift hours, attendance entry</li>
+          <li>Leave requests, approval</li>
+          <li>Submits monthly hours → feeds Admin payroll engine (branch cannot run payroll itself)</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Branch-Level Reports</div>
+        <ul class="feat-list">
+          <li>Own branch's daily/weekly sales view (read-only beyond own branch)</li>
+          <li>Stock turnover view</li>
+        </ul>
+      </div>
+    </div>
+    <div class="tech-row">
+      <span class="tech-pill hl">React 18 + TypeScript</span>
+      <span class="tech-pill">WebSocket client (live order queue)</span>
+      <span class="tech-pill">Tailwind CSS</span>
+      <span class="tech-pill">Tablet-optimized layout (counter use)</span>
+    </div>
+  </div>
+
+  <!-- Admin Portal -->
+  <div class="portal-block">
+    <div class="portal-block-head">
+      <span class="portal-block-dot" style="background:var(--gold);"></span>
+      <span class="portal-block-title">Admin Portal</span>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-item">
+        <div class="feat-item-title">Global Pricing Control</div>
+        <ul class="feat-list">
+          <li>Edit any product price — propagates to all branches & customer menu instantly</li>
+          <li>Price change history per item (who changed it, when, from→to)</li>
+          <li>Schedule future price changes (e.g. effective next Monday)</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Payroll Processing</div>
+        <ul class="feat-list">
+          <li>Pull hours/attendance from all branches</li>
+          <li>Calculate pay, deductions, generate payslips</li>
+          <li>Approve & disburse (bank transfer file export or payment gateway integration)</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Financial Reporting Engine</div>
+        <ul class="feat-list">
+          <li>Daily / weekly / monthly / annual reports — sales, expenses, profit by branch or all</li>
+          <li>Export to Excel/PDF</li>
+          <li>Drill down: region → branch → individual day</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Stock Oversight</div>
+        <ul class="feat-list">
+          <li>View stock levels across all branches</li>
+          <li>Approve/reject restock requests</li>
+          <li>Supplier management, purchase order generation</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Account & Access Management</div>
+        <ul class="feat-list">
+          <li>Create Store Manager accounts, assign to a specific branch</li>
+          <li>Create Regional Manager accounts, assign a set of branches/region</li>
+          <li>Create Finance role and Support role accounts with scoped permissions</li>
+          <li>Deactivate/suspend any account instantly</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Audit Log Viewer</div>
+        <ul class="feat-list">
+          <li>Searchable, filterable view of every system event (read-only, even for Super Admin)</li>
+          <li>Filter by user, action type, date range, branch</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Customer Oversight</div>
+        <ul class="feat-list">
+          <li>View customer list, order history, loyalty balances</li>
+          <li>Manually adjust loyalty points (with mandatory reason — logged to audit)</li>
+        </ul>
+      </div>
+      <div class="feat-item">
+        <div class="feat-item-title">Marketing & Notifications</div>
+        <ul class="feat-list">
+          <li>Compose & send WhatsApp/email/SMS campaigns to customer segments</li>
+          <li>Schedule social media posts/ads from one panel</li>
+        </ul>
+      </div>
+    </div>
+    <div class="tech-row">
+      <span class="tech-pill hl">React 18 + TypeScript</span>
+      <span class="tech-pill">Recharts/D3 (reporting dashboards)</span>
+      <span class="tech-pill">Tailwind CSS + shadcn/ui</span>
+      <span class="tech-pill">Desktop-first responsive layout</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ LAYER 2 ═══════════════════════════════════════ -->
+<div class="section">
+  <div class="layer-banner l2">
+    <div class="layer-num">02</div>
+    <div class="layer-banner-text">
+      <div class="lb-title">Application & Business Logic Layer</div>
+      <div class="lb-sub">The backend services that enforce rules, process data, and connect the portals to the database</div>
+    </div>
+  </div>
+
+  <p class="section-body">This layer is built as a set of focused services rather than one giant codebase. Each service owns one job — orders, payroll, stock, etc. — so a bug or slowdown in, say, the notification service can never bring down order-taking. Communication between services and the front-end happens over a REST API; some live features (order queue updates) use WebSockets for instant push instead of the front-end having to repeatedly ask "anything new?".</p>
+
+  <div class="tech-row">
+    <span class="tech-pill hl">Node.js + NestJS</span>
+    <span class="tech-pill">REST API (JSON over HTTPS)</span>
+    <span class="tech-pill">WebSocket (Socket.io) — live order queue & notifications</span>
+    <span class="tech-pill">Redis — caching & session store</span>
+    <span class="tech-pill">JWT — auth tokens</span>
+    <span class="tech-pill">Docker containers, one per service</span>
+  </div>
+  <p class="section-body" style="margin-top:10px; font-size:12.5px;">Why NestJS over plain Express: it enforces a consistent structure (modules, controllers, services) across a system this size, which matters once more than one developer is touching the codebase — plain Express gets messy fast at this scope without that structure.</p>
+
+  <div class="service-grid">
+    <div class="service-card">
+      <div class="service-card-head"><span class="service-name">Auth Service</span><span class="pill blue">Core</span></div>
+      <div class="service-desc">Handles login, OTP verification, JWT issuing, role/permission checks on every request.</div>
+      <div class="service-endpoints">
+        <span class="verb post">POST</span> /auth/otp/send<br>
+        <span class="verb post">POST</span> /auth/otp/verify<br>
+        <span class="verb post">POST</span> /auth/login<br>
+        <span class="verb">GET</span> /auth/me<br>
+        <span class="verb post">POST</span> /auth/refresh-token
+      </div>
+    </div>
+
+    <div class="service-card">
+      <div class="service-card-head"><span class="service-name">Order Service</span><span class="pill green">Core</span></div>
+      <div class="service-desc">Order creation, status transitions, kitchen queue feed, order history.</div>
+      <div class="service-endpoints">
+        <span class="verb post">POST</span> /orders<br>
+        <span class="verb">GET</span> /orders/:id<br>
+        <span class="verb put">PUT</span> /orders/:id/status<br>
+        <span class="verb">GET</span> /branches/:id/orders/queue<br>
+        <span class="verb">WS</span> order.status.changed
+      </div>
+    </div>
+
+    <div class="service-card">
+      <div class="service-card-head"><span class="service-name">Inventory Service</span><span class="pill amber">Core</span></div>
+      <div class="service-desc">Stock levels, restock request workflow, supplier records.</div>
+      <div class="service-endpoints">
+        <span class="verb">GET</span> /branches/:id/stock<br>
+        <span class="verb put">PUT</span> /branches/:id/stock/:itemId<br>
+        <span class="verb post">POST</span> /restock-requests<br>
+        <span class="verb put">PUT</span> /restock-requests/:id/approve
+      </div>
+    </div>
+
+    <div class="service-card">
+      <div class="service-card-head"><span class="service-name">Finance & Payroll Service</span><span class="pill red">Sensitive</span></div>
+      <div class="service-desc">Daily sales aggregation, expense entry, payroll runs, payslip generation. Highest permission sensitivity — Finance role + Admin only.</div>
+      <div class="service-endpoints">
+        <span class="verb post">POST</span> /branches/:id/daily-sales<br>
+        <span class="verb post">POST</span> /payroll/run<br>
+        <span class="verb">GET</span> /payroll/payslips/:employeeId<br>
+        <span class="verb">GET</span> /reports/financial?period=
+      </div>
+    </div>
+
+    <div class="service-card">
+      <div class="service-card-head"><span class="service-name">Loyalty Service</span><span class="pill teal" style="background:rgba(20,184,166,0.15);color:var(--teal);">Customer-facing</span></div>
+      <div class="service-desc">Points earning rules, redemption, wallet pass generation (Apple/Google Wallet).</div>
+      <div class="service-endpoints">
+        <span class="verb">GET</span> /customers/:id/points<br>
+        <span class="verb post">POST</span> /loyalty/earn<br>
+        <span class="verb post">POST</span> /loyalty/redeem<br>
+        <span class="verb post">POST</span> /loyalty/wallet-pass
+      </div>
+    </div>
+
+    <div class="service-card">
+      <div class="service-card-head"><span class="service-name">Pricing Service</span><span class="pill purple">Admin-only write</span></div>
+      <div class="service-desc">Product catalog and pricing, with full price-change history.</div>
+      <div class="service-endpoints">
+        <span class="verb">GET</span> /products<br>
+        <span class="verb put">PUT</span> /products/:id/price<br>
+        <span class="verb">GET</span> /products/:id/price-history
+      </div>
+    </div>
+
+    <div class="service-card">
+      <div class="service-card-head"><span class="service-name">Notification Service</span><span class="pill blue">Integration</span></div>
+      <div class="service-desc">Routes outbound messages to WhatsApp, Email, SMS providers; manages opt-in/out, templates, campaign scheduling.</div>
+      <div class="service-endpoints">
+        <span class="verb post">POST</span> /notifications/send<br>
+        <span class="verb post">POST</span> /campaigns<br>
+        <span class="verb">GET</span> /customers/:id/notification-prefs
+      </div>
+    </div>
+
+    <div class="service-card">
+      <div class="service-card-head"><span class="service-name">Audit Log Service</span><span class="pill red">Write-once</span></div>
+      <div class="service-desc">Every other service calls this to record an event. No service — including Admin's own — has update/delete access to what's written here.</div>
+      <div class="service-endpoints">
+        <span class="verb post">POST</span> /audit/events <span style="color:var(--muted)">(internal only)</span><br>
+        <span class="verb">GET</span> /audit/events?filter= <span style="color:var(--muted)">(Admin read)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="verdict">
+    <div class="verdict-label">How a Price Change Actually Flows Through the System</div>
+    <div class="verdict-sub">
+      <div class="flow-diagram">
+        <span class="flow-step">Admin edits price in UI</span><span class="flow-arrow">→</span>
+        <span class="flow-step">Pricing Service validates & saves new price</span><span class="flow-arrow">→</span>
+        <span class="flow-step">Pricing Service writes event to Audit Log Service</span><span class="flow-arrow">→</span>
+        <span class="flow-step">Change pushed to Redis cache</span><span class="flow-arrow">→</span>
+        <span class="flow-step">Customer + Branch portals read new price on next request</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ LAYER 3 ═══════════════════════════════════════ -->
+<div class="section" style="border-bottom: none;">
+  <div class="layer-banner l3">
+    <div class="layer-num">03</div>
+    <div class="layer-banner-text">
+      <div class="lb-title">Data Layer — The Database(s)</div>
+      <div class="lb-sub">Where everything actually lives, and how it stays safe and audit-proof</div>
+    </div>
+  </div>
+
+  <p class="section-body">Not one database doing everything — two physically separate database instances. This split exists specifically so the audit log can be made tamper-proof: it sits where even a Super Admin's application credentials have no delete/update rights, enforced at the database permission level, not just by app-level rules that a bug or insider could bypass.</p>
+
+  <div class="db-grid">
+    <div class="db-card">
+      <div class="db-card-title">Primary Operational Database</div>
+      <div class="db-card-eng">PostgreSQL 16, Multi-AZ</div>
+      <ul class="feat-list">
+        <li>All live business data: users, orders, stock, finance, payroll, pricing, loyalty</li>
+        <li>Strong relational consistency — critical for financial accuracy</li>
+        <li>Row-level security policies enforce branch/region data isolation at the DB level, not just app code</li>
+        <li>Automatic synchronous replica in a second data center (this is what gives zero-downtime failover)</li>
+      </ul>
+    </div>
+    <div class="db-card audit">
+      <div class="db-card-title">Audit Log Database</div>
+      <div class="db-card-eng">PostgreSQL, separate instance, append-only</div>
+      <ul class="feat-list">
+        <li>Single table design: who, what, when, before-value, after-value</li>
+        <li>Application's DB user has INSERT and SELECT only — no UPDATE, no DELETE, enforced by Postgres GRANT permissions</li>
+        <li>Physically separate instance so a breach of the main DB doesn't expose write access here too</li>
+        <li>Indexed by user, branch, action type, timestamp for fast filtering in the Admin audit viewer</li>
+      </ul>
+    </div>
+    <div class="db-card">
+      <div class="db-card-title">Cache & Session Layer</div>
+      <div class="db-card-eng">Redis</div>
+      <ul class="feat-list">
+        <li>Active login sessions / JWT blacklist (for instant logout/account suspension)</li>
+        <li>Cached product prices & menu (fast reads, refreshed on price change)</li>
+        <li>Real-time order queue state for WebSocket push</li>
+      </ul>
+    </div>
+    <div class="db-card">
+      <div class="db-card-title">File & Object Storage</div>
+      <div class="db-card-eng">S3-compatible object storage</div>
+      <ul class="feat-list">
+        <li>Menu item photos, receipt/expense photo uploads, issue report attachments</li>
+        <li>Payslip PDFs, generated financial reports</li>
+      </ul>
+    </div>
+  </div>
+
+  <table class="data-table">
+    <thead><tr><th>Table Group</th><th>Key Tables</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Identity</td><td><code>users</code>, <code>roles</code>, <code>permissions</code>, <code>branches</code>, <code>regions</code></td><td>One users table for all roles; role determines what they can touch</td></tr>
+      <tr><td>Customer</td><td><code>customer_profiles</code>, <code>loyalty_points</code>, <code>loyalty_transactions</code></td><td>loyalty_transactions is itself append-only — balance is always a calculated sum, never directly edited</td></tr>
+      <tr><td>Orders</td><td><code>orders</code>, <code>order_items</code>, <code>order_status_history</code></td><td>Status history table, not a single status field — preserves full timeline</td></tr>
+      <tr><td>Inventory</td><td><code>stock_items</code>, <code>stock_levels</code>, <code>restock_requests</code>, <code>suppliers</code></td><td>stock_levels is per-branch, foreign-keyed to branches</td></tr>
+      <tr><td>Finance</td><td><code>daily_sales</code>, <code>expenses</code>, <code>payroll_runs</code>, <code>payslips</code></td><td>payroll_runs locked once disbursed — corrections require a new adjustment record, not an edit</td></tr>
+      <tr><td>Pricing</td><td><code>products</code>, <code>price_history</code></td><td>products.current_price is denormalized for fast reads; price_history is the source of truth</td></tr>
+      <tr><td>Audit (separate DB)</td><td><code>audit_events</code></td><td>One wide table: actor_id, action, entity_type, entity_id, before_json, after_json, timestamp</td></tr>
+    </tbody>
+  </table>
+
+  <div class="verdict">
+    <div class="verdict-label">Database Permission Reality Check</div>
+    <div class="verdict-text">Two database users, two different rights — enforced by Postgres itself.</div>
+    <div class="verdict-sub">The application connects to the primary DB with a user that has normal read/write. It connects to the audit DB with a <em>different</em> database user that Postgres has only granted INSERT and SELECT to — no GRANT for UPDATE or DELETE exists at all. This means even if there were a bug in the application code that tried to edit a past audit record, the database itself would refuse the query before it ever happened. That's what makes "non-editable" a real guarantee instead of just a policy.</div>
+  </div>
+</div>
+
+<div class="footer">
+  <strong>How to use this document:</strong> This breakdown is structured so each portal's feature list and each service's endpoint list can be lifted directly into sprint tickets. Recommended build order: Auth + Audit Log Service first (everything else depends on them) → Inventory + Order Service → Finance/Payroll Service → Loyalty Service → Notification Service last (least urgent, easiest to bolt on). Tech choices above (Node.js/NestJS, PostgreSQL, Redis, React) reflect standard, well-supported 2026 tooling for this exact category of system — real-time order flow plus strong financial consistency — rather than experimental or niche frameworks, so hiring developers and finding documentation will be straightforward.
+</div>
+
+</body>
+</html>

@@ -1,0 +1,18 @@
+# Caddy automatically provisions Let's Encrypt TLS certificates.
+# Replace the domain names below if needed.
+
+ligerasynergy.co.uk, www.ligerasynergy.co.uk {
+    encode gzip
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options    "nosniff"
+        X-Frame-Options           "SAMEORIGIN"
+        X-XSS-Protection          "1; mode=block"
+        Referrer-Policy           "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    reverse_proxy app:3000
+}

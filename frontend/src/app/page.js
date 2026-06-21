@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { MENU_ITEMS, INITIAL_STORES } from './store-data';
-import { syncWithServer, pushToServer, apiLogin, apiSignup, apiPlaceOrder, fetchStores, fetchMenu, getToken, setToken, clearToken } from './db-sync';
+import { syncWithServer, pushToServer, apiLogin, apiSignup, apiPlaceOrder, fetchStores, fetchMenu, getToken, setToken, clearToken, apiGetProfile, apiUpdateProfile, apiGetLoyalty, apiSubmitSupportTicket } from './db-sync';
 
 // Helper component for Veg/Non-Veg badge
 function VegNonVegBadge({ type }) {
@@ -44,6 +44,14 @@ export default function Storefront() {
   const [authName, setAuthName] = useState('');
   const [authError, setAuthError] = useState('');
   const [showOrdersDrawer, setShowOrdersDrawer] = useState(false);
+  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
+  const [profileData, setProfileData] = useState({ phone: '', name: '', email: '' });
+  const [showLoyaltyDrawer, setShowLoyaltyDrawer] = useState(false);
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportOrder, setSupportOrder] = useState(null);
+  const [useLoyaltyPoints, setUseLoyaltyPoints] = useState(false);
+  const [redeemPoints, setRedeemPoints] = useState(0);
   
   // Dynamic menu items maintained by Admin
   const [menuItems, setMenuItems] = useState([]);
@@ -383,7 +391,9 @@ export default function Storefront() {
 
     const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const tax = subtotal * 0.08;
-    const total = subtotal + tax;
+    const baseTotal = subtotal + tax;
+    const lDiscount = useLoyaltyPoints ? Math.min(loyaltyPoints, baseTotal) : 0;
+    const total = baseTotal - lDiscount;
     const orderId = `ord-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const finalizeOrder = async (payId = null, rzpOrderId = null, rzpSignature = null) => {
@@ -394,6 +404,7 @@ export default function Storefront() {
         items: cart.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
         subtotal: parseFloat(subtotal.toFixed(2)),
         tax: parseFloat(tax.toFixed(2)),
+        loyaltyDiscount: parseFloat(lDiscount.toFixed(2)),
         total: parseFloat(total.toFixed(2)),
         status: 'Pending',
         timestamp: new Date().toISOString(),
@@ -415,9 +426,15 @@ export default function Storefront() {
           customerName: customerName.trim(),
           razorpayPaymentId: payId,
           razorpayOrderId: rzpOrderId,
-          razorpaySignature: rzpSignature
+          razorpaySignature: rzpSignature,
+          loyaltyPointsUsed: lDiscount,
+          loyaltyDiscount: lDiscount
         });
         if (result.order) {
+          if (lDiscount > 0) {
+            setLoyaltyPoints(prev => Math.max(0, prev - lDiscount));
+            setUseLoyaltyPoints(false);
+          }
           const currentActiveOrders = JSON.parse(localStorage.getItem('ccc_active_orders') || '[]');
           const updatedActiveOrders = [...currentActiveOrders, result.order];
           localStorage.setItem('ccc_active_orders', JSON.stringify(updatedActiveOrders));
@@ -520,9 +537,11 @@ export default function Storefront() {
     return matchesSearch;
   });
 
-  const cartSubtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartTax = cartSubtotal * 0.08;
   const cartTotal = cartSubtotal + cartTax;
+  const loyaltyDiscount = useLoyaltyPoints ? Math.min(loyaltyPoints, cartTotal) : 0;
+  const finalTotal = cartTotal - loyaltyDiscount;
 
   const PROMOS = [
     {
@@ -628,6 +647,31 @@ export default function Storefront() {
             {currentUser ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black text-gray-700 hidden md:inline">Hi, {currentUser.name}</span>
+                <button
+                  onClick={async () => {
+                    try {
+                      const prof = await apiGetProfile();
+                      setProfileData({ name: prof.name || currentUser.name, phone: prof.phone || '', email: prof.email || currentUser.email });
+                      if (prof.loyalty_points !== undefined) setLoyaltyPoints(prof.loyalty_points);
+                    } catch (e) { console.error('Failed to fetch profile', e); }
+                    setShowProfileDrawer(true);
+                  }}
+                  className="p-1.5 border border-gray-300 hover:border-red-600 text-gray-600 hover:text-[#E4002B] rounded-full transition-all animate-fade-in"
+                  title="My Profile"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={async () => {
+                    await syncWithServer();
+                    setShowOrdersDrawer(true);
+                  }}
+                  className="px-3.5 py-1.5 border border-gray-300 hover:border-red-600 text-gray-600 hover:text-[#E4002B] font-extrabold text-xs uppercase rounded-full transition-all tracking-wider animate-fade-in"
+                >
+                  My Orders
+                </button>
                 <button
                   onClick={handleLogout}
                   className="px-3.5 py-1.5 border border-gray-300 hover:border-red-600 text-gray-600 hover:text-[#E4002B] font-extrabold text-xs uppercase rounded-full transition-all tracking-wider animate-fade-in"
@@ -1324,9 +1368,38 @@ export default function Storefront() {
                     <span>GST & VAT (8%)</span>
                     <span className="text-black">₹{cartTax.toFixed(2)}</span>
                   </div>
+
+                  {currentUser && loyaltyPoints > 0 && (
+                    <div className="flex justify-between items-center bg-orange-50 p-2 rounded-lg border border-orange-100 mt-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">🏅</span>
+                        <div>
+                          <p className="text-[10px] font-black text-orange-800 uppercase">Use Loyalty Points</p>
+                          <p className="text-[9px] text-orange-600 font-bold">Balance: {loyaltyPoints} pts</p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={useLoyaltyPoints} 
+                          onChange={() => setUseLoyaltyPoints(!useLoyaltyPoints)} 
+                        />
+                        <div className="w-8 h-4.5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-[#E4002B]"></div>
+                      </label>
+                    </div>
+                  )}
+
+                  {useLoyaltyPoints && loyaltyDiscount > 0 && (
+                    <div className="flex justify-between text-[#E4002B]">
+                      <span>Loyalty Discount</span>
+                      <span>-₹{loyaltyDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between border-t border-dashed border-gray-200 pt-2.5 text-sm font-black text-black">
                     <span>Total Cost</span>
-                    <span className="text-[#E4002B] text-base font-black">₹{cartTotal.toFixed(2)}</span>
+                    <span className="text-[#E4002B] text-base font-black">₹{finalTotal.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -1368,6 +1441,218 @@ export default function Storefront() {
                 </form>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Profile Drawer */}
+      {showProfileDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            onClick={() => setShowProfileDrawer(false)}
+            className="absolute inset-0 bg-black/45 backdrop-blur-sm transition-opacity"
+          ></div>
+          <div className="relative w-full max-w-md bg-[#F8F9FA] h-full shadow-2xl flex flex-col z-10 animate-slide-in">
+            <div className="p-5 flex justify-between items-center bg-white border-b border-gray-100">
+              <h2 className="text-xl font-black text-black">My Profile</h2>
+              <button
+                onClick={() => setShowProfileDrawer(false)}
+                className="p-1 hover:bg-gray-100 rounded-full text-black border border-gray-300 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-6">
+              {/* ID Card Style Banner */}
+              <div className="bg-gradient-to-br from-[#E4002B] to-orange-500 rounded-[24px] p-6 text-white shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full -ml-8 -mb-8 blur-lg"></div>
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <p className="text-xs font-bold text-white/80 uppercase tracking-widest mb-1">Crispy Customer ID</p>
+                      <h3 className="text-2xl font-black">{profileData.name}</h3>
+                    </div>
+                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-inner">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="#E4002B" className="w-8 h-8">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75ZM6.75 16.5h.75v.75h-.75v-.75ZM16.5 6.75h.75v.75h-.75v-.75ZM13.5 13.5h.75v.75h-.75v-.75ZM13.5 19.5h.75v.75h-.75v-.75ZM19.5 13.5h.75v.75h-.75v-.75ZM19.5 19.5h.75v.75h-.75v-.75ZM16.5 16.5h.75v.75h-.75v-.75Z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 text-sm font-bold opacity-90">
+                    <p>{profileData.email}</p>
+                    <p>{profileData.phone || 'Add phone number below'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions (Pill design) */}
+              <div>
+                <h4 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 px-1">Quick Actions</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div 
+                    onClick={async () => { 
+                      try {
+                        const lData = await apiGetLoyalty();
+                        setLoyaltyPoints(lData.points || 0);
+                      } catch(e) {}
+                      setShowProfileDrawer(false); 
+                      setShowLoyaltyDrawer(true); 
+                    }}
+                    className="bg-white p-4 rounded-[20px] shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-[#E4002B] hover:shadow-md transition-all group"
+                  >
+                    <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <span className="text-xl">🍗</span>
+                    </div>
+                    <span className="text-xs font-black text-black">Loyalty Points</span>
+                    <span className="text-[10px] text-[#E4002B] font-bold bg-red-50 px-2 py-0.5 rounded-full">{loyaltyPoints} pts</span>
+                  </div>
+                  <div 
+                    onClick={() => { setShowProfileDrawer(false); setShowSupportModal(true); }}
+                    className="bg-white p-4 rounded-[20px] shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-[#E4002B] hover:shadow-md transition-all group"
+                  >
+                    <div className="w-12 h-12 bg-sky-50 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-sky-500">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 0 1-.923 1.785A5.969 5.969 0 0 0 6 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337Z" />
+                      </svg>
+                    </div>
+                    <span className="text-xs font-black text-black">Support</span>
+                    <span className="text-[10px] text-gray-500 font-bold">Need help?</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Edit Details Form */}
+              <div>
+                <h4 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 px-1">Personal Details</h4>
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Full Name</label>
+                    <input 
+                      type="text" 
+                      value={profileData.name}
+                      onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                      className="w-full text-sm font-bold border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#E4002B] focus:ring-1 focus:ring-[#E4002B]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Phone Number</label>
+                    <input 
+                      type="tel" 
+                      value={profileData.phone}
+                      onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                      placeholder="e.g. 9876543210"
+                      className="w-full text-sm font-bold border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#E4002B] focus:ring-1 focus:ring-[#E4002B]"
+                    />
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      try {
+                        await apiUpdateProfile({ name: profileData.name, phone: profileData.phone });
+                        alert('Profile updated successfully!');
+                      } catch(e) {
+                        alert('Failed to update profile.');
+                      }
+                    }}
+                    className="w-full py-3 bg-black hover:bg-gray-800 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-colors"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loyalty Wallet Drawer */}
+      {showLoyaltyDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            onClick={() => setShowLoyaltyDrawer(false)}
+            className="absolute inset-0 bg-black/45 backdrop-blur-sm transition-opacity"
+          ></div>
+          <div className="relative w-full max-w-md bg-[#F8F9FA] h-full shadow-2xl flex flex-col z-10 animate-slide-in">
+            <div className="p-5 flex justify-between items-center bg-white border-b border-gray-100">
+              <h2 className="text-xl font-black text-black">Loyalty Wallet</h2>
+              <button
+                onClick={() => setShowLoyaltyDrawer(false)}
+                className="p-1 hover:bg-gray-100 rounded-full text-black border border-gray-300 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-6">
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 text-center flex flex-col items-center">
+                <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mb-4">
+                  <span className="text-4xl">🏅</span>
+                </div>
+                <h3 className="text-sm font-black text-gray-500 uppercase tracking-widest">Available Points</h3>
+                <p className="text-4xl font-black text-[#E4002B] my-2">{loyaltyPoints}</p>
+                <p className="text-xs text-gray-500 font-bold max-w-xs">You can apply these points during checkout to get a discount on your order! (1 pt = ₹1)</p>
+              </div>
+              
+              <div>
+                <h4 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 px-1">How it works</h4>
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-3 text-xs font-bold text-gray-600">
+                  <div className="flex gap-3">
+                    <span className="text-xl">🍗</span>
+                    <p>Earn points every time you place an order with Crispy Chicken Co.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <span className="text-xl">💰</span>
+                    <p>Redeem points for an instant discount when checking out.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Support Ticket Modal */}
+      {showSupportModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div onClick={() => { setShowSupportModal(false); setSupportOrder(null); }} className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+          <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-sm relative z-10 animate-scale-in">
+            <h3 className="text-lg font-black text-black mb-4">Need Help?</h3>
+            <p className="text-xs font-bold text-gray-500 mb-4">Please describe your issue below. Our team will get back to you shortly.</p>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                const subject = e.target.subject.value;
+                const message = e.target.message.value;
+                await apiSubmitSupportTicket(subject, message, supportOrder?.id);
+                alert("Support ticket submitted! We'll contact you soon.");
+                setShowSupportModal(false);
+                setSupportOrder(null);
+              } catch(err) {
+                alert("Failed to submit ticket.");
+              }
+            }}>
+              {supportOrder && (
+                <div className="mb-4 text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-100 p-2 rounded-lg">
+                  Order ID attached: {supportOrder.id}
+                </div>
+              )}
+              <div className="mb-4">
+                <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Subject</label>
+                <input required name="subject" type="text" placeholder="What is this regarding?" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-[#E4002B]" />
+              </div>
+              <div className="mb-4">
+                <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Message</label>
+                <textarea required name="message" rows="4" placeholder="Describe the issue..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-[#E4002B]"></textarea>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => { setShowSupportModal(false); setSupportOrder(null); }} className="px-4 py-2 font-black text-xs text-gray-500 hover:bg-gray-100 rounded-full">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-[#E4002B] hover:bg-[#C30022] text-white font-black text-xs uppercase rounded-full tracking-wide">Submit Ticket</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

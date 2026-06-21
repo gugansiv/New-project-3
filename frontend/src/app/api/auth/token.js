@@ -1,6 +1,12 @@
 import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'crispy-chicken-secret-key-1234567890';
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('FATAL: JWT_SECRET environment variable is not set!');
+  }
+  return secret;
+}
 
 // Hashing Helpers (scrypt)
 export function hashPassword(password) {
@@ -10,18 +16,20 @@ export function hashPassword(password) {
 }
 
 export function verifyPassword(password, storedHash) {
-  if (!storedHash) return false;
-  // Fallback for default plaintext passwords (e.g. admin123) if not hashed yet
-  if (!storedHash.includes(':')) {
-    return password === storedHash;
-  }
+  if (!storedHash || !storedHash.includes(':')) return false;
+  
   const [salt, hash] = storedHash.split(':');
   const checkHash = crypto.scryptSync(password, salt, 64).toString('hex');
-  return hash === checkHash;
+  
+  const a = Buffer.from(hash, 'hex');
+  const b = Buffer.from(checkHash, 'hex');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 // JWT Token Helpers
 export function generateToken(payload) {
+  const secret = getJwtSecret();
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const payloadStr = Buffer.from(JSON.stringify({
     ...payload,
@@ -29,7 +37,7 @@ export function generateToken(payload) {
   })).toString('base64url');
   
   const signature = crypto
-    .createHmac('sha256', JWT_SECRET)
+    .createHmac('sha256', secret)
     .update(`${header}.${payloadStr}`)
     .digest('base64url');
     
@@ -43,14 +51,16 @@ export function verifyToken(token) {
   
   const [header, payload, signature] = parts;
   
+  const secret = getJwtSecret();
   const expectedSignature = crypto
-    .createHmac('sha256', JWT_SECRET)
+    .createHmac('sha256', secret)
     .update(`${header}.${payload}`)
     .digest('base64url');
     
-  if (signature !== expectedSignature) {
-    return null;
-  }
+  const a = Buffer.from(signature, 'base64url');
+  const b = Buffer.from(expectedSignature, 'base64url');
+  if (a.length !== b.length) return null;
+  if (!crypto.timingSafeEqual(a, b)) return null;
   
   try {
     const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));

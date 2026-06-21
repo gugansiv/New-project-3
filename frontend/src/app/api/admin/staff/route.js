@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb } from '../../db/db-helper';
-import { verifyToken } from '../../auth/token';
-import { hashPassword } from '../../auth/token';
+import { pool, initDbTables } from '../../db/db-helper';
+import { verifyToken, hashPassword } from '../../auth/token';
+import crypto from 'crypto';
 
 function getAuthUser(request) {
   const authHeader = request.headers.get('Authorization');
@@ -9,10 +9,43 @@ function getAuthUser(request) {
   return verifyToken(authHeader.substring(7));
 }
 
+async function getSafeUsers() {
+  const res = await pool.query('SELECT id, name, email, role, "storeId" FROM users ORDER BY name ASC');
+  return res.rows;
+}
+
+async function getStores() {
+  const res = await pool.query("SELECT * FROM stores WHERE status != 'Archived' ORDER BY name ASC");
+  return res.rows.map(s => ({
+    ...s,
+    rent: parseFloat(s.rent || 0),
+    dailyTarget: parseFloat(s.dailyTarget || 0),
+    historicalRevenue: parseFloat(s.historicalRevenue || 0)
+  }));
+}
+
+// GET /api/admin/staff - List users (admin only, no passwords)
+export async function GET(request) {
+  await initDbTables();
+  const user = getAuthUser(request);
+  if (!user || (user.role !== 'SUPER_ADMIN' && user.role !== 'SUPER_ADMIN')) {
+    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+  }
+
+  try {
+    const safeUsers = await getSafeUsers();
+    return NextResponse.json({ users: safeUsers });
+  } catch (err) {
+    console.error('Fetch staff error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 // POST /api/admin/staff - Create a store manager (admin only)
 export async function POST(request) {
+  await initDbTables();
   const user = getAuthUser(request);
-  if (!user || user.role !== 'admin') {
+  if (!user || (user.role !== 'SUPER_ADMIN' && user.role !== 'SUPER_ADMIN')) {
     return NextResponse.json({ error: 'Unauthorized. Admin access required.' }, { status: 401 });
   }
 
@@ -22,55 +55,122 @@ export async function POST(request) {
       return NextResponse.json({ error: 'All fields (name, email, password, storeId) are required.' }, { status: 400 });
     }
 
-    const db = getDb();
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return NextResponse.json({ error: 'Invalid email address format.' }, { status: 400 });
+    }
+
+    // Password strength check (min 8 characters)
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'Password must be at least 8 characters long.' }, { status: 400 });
+    }
 
     // Check duplicate email
-    if (db.users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+    const dupCheck = await pool.query('SELECT COUNT(*) FROM users WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    if (parseInt(dupCheck.rows[0].count, 10) > 0) {
       return NextResponse.json({ error: 'Email already registered.' }, { status: 409 });
     }
 
     const hashedPassword = hashPassword(password);
-    const newManager = {
-      id: `usr-${Math.floor(1000 + Math.random() * 9000)}`,
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      password: hashedPassword,
-      role: 'store_manager',
-      storeId
-    };
+    const newId = `usr-${crypto.randomUUID()}`;
 
-    const updatedUsers = [...db.users, newManager];
+    // Insert user
+    await pool.query(
+      `INSERT INTO users (id, name, email, password, role, "storeId")
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [newId, name.trim(), email.trim().toLowerCase(), hashedPassword, 'BRANCH_MANAGER', storeId]
+    );
 
-    // Also update the store's manager field
-    const updatedStores = db.stores.map(s => {
-      if (s.id === storeId) {
-        return { ...s, manager: name.trim() };
-      }
-      return s;
-    });
+    // Update store manager field
+    await pool.query(
+      'UPDATE stores SET manager = $1 WHERE id = $2',
+      [name.trim(), storeId]
+    );
 
-    saveDb({ ...db, users: updatedUsers, stores: updatedStores });
+    const safeUsers = await getSafeUsers();
+    const stores = await getStores();
 
-    // Return without passwords
-    const safeUsers = updatedUsers.map(({ password: _pw, ...rest }) => rest);
     return NextResponse.json({ 
       success: true, 
       users: safeUsers, 
-      stores: updatedStores 
+      stores 
     });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Create staff error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// GET /api/admin/staff - List users (admin only, no passwords)
-export async function GET(request) {
+// PUT /api/admin/staff - Update a store manager (admin only)
+export async function PUT(request) {
+  await initDbTables();
   const user = getAuthUser(request);
-  if (!user || user.role !== 'admin') {
-    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+  if (!user || user.role !== 'SUPER_ADMIN') {
+    return NextResponse.json({ error: 'Unauthorized. Admin access required.' }, { status: 401 });
   }
 
-  const db = getDb();
-  const safeUsers = db.users.map(({ password, ...rest }) => rest);
-  return NextResponse.json({ users: safeUsers });
+  try {
+    const { id, name, email, password, storeId } = await request.json();
+    if (!id) {
+      return NextResponse.json({ error: 'User ID (id) is required.' }, { status: 400 });
+    }
+
+    // Build update query dynamically
+    let queryText = 'UPDATE users SET ';
+    const queryParams = [];
+    let paramIndex = 1;
+
+    if (name) {
+      queryText += `name = $${paramIndex}, `;
+      queryParams.push(name.trim());
+      paramIndex++;
+    }
+    if (email) {
+      queryText += `email = $${paramIndex}, `;
+      queryParams.push(email.trim().toLowerCase());
+      paramIndex++;
+    }
+    if (password) {
+      queryText += `password = $${paramIndex}, `;
+      queryParams.push(hashPassword(password));
+      paramIndex++;
+    }
+    if (storeId !== undefined) {
+      queryText += `"storeId" = $${paramIndex}, `;
+      queryParams.push(storeId);
+      paramIndex++;
+    }
+
+    // Remove trailing comma and space
+    queryText = queryText.slice(0, -2);
+    queryText += ` WHERE id = $${paramIndex}`;
+    queryParams.push(id);
+
+    await pool.query(queryText, queryParams);
+
+    // Get current manager details to update the stores manager mapping
+    const managerRes = await pool.query('SELECT name, "storeId" FROM users WHERE id = $1', [id]);
+    if (managerRes.rows.length > 0) {
+      const manager = managerRes.rows[0];
+      if (manager.storeId) {
+        await pool.query(
+          'UPDATE stores SET manager = $1 WHERE id = $2',
+          [manager.name, manager.storeId]
+        );
+      }
+    }
+
+    const safeUsers = await getSafeUsers();
+    const stores = await getStores();
+
+    return NextResponse.json({ 
+      success: true, 
+      users: safeUsers, 
+      stores 
+    });
+  } catch (err) {
+    console.error('Update staff error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

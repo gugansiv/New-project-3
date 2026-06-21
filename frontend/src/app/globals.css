@@ -119,3 +119,227 @@ body {
   border: 2px solid #1A1A1A;
   font-weight: 600;
 }
+
+/* ============ SKEUOMORPHIC UI SYSTEM ============ */
+
+/* Raised Tactile Panel */
+.skeuo-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f3f4f6 100%) !important;
+  border: 1px solid #d1d5db !important;
+  border-top-color: #f9fafb !important;
+  border-bottom-color: #9ca3af !important;
+  border-left-color: #e5e7eb !important;
+  border-right-color: #e5e7eb !important;
+  box-shadow: 
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 4px 12px rgba(0, 0, 0, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+:global(.dark) .skeuo-card,
+.dark .skeuo-card {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%) !important;
+  border: 1px solid #1e293b !important;
+  border-top-color: #334155 !important;
+  border-bottom-color: #020617 !important;
+  border-left-color: #0f172a !important;
+  border-right-color: #0f172a !important;
+  box-shadow: 
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Debossed Inset Well (perfect for inputs, search bars, static containers) */
+.skeuo-well {
+  background: #f9fafb !important;
+  border: 1px solid #d1d5db !important;
+  border-top-color: #9ca3af !important;
+  border-left-color: #9ca3af !important;
+  border-bottom-color: #f3f4f6 !important;
+  border-right-color: #f3f4f6 !important;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.06),
+    inset 0 1px 2px rgba(0, 0, 0, 0.04),
+    0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+
+:global(.dark) .skeuo-well,
+.dark .skeuo-well {
+  background: #090d16 !important;
+  border: 1px solid #1e293b !important;
+  border-top-color: #020617 !important;
+  border-left-color: #020617 !important;
+  border-bottom-color: #1e293b !important;
+  border-right-color: #1e293b !important;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Tactile Raised Button */
+.skeuo-btn {
+  background: linear-gradient(180deg, #ffffff 0%, #e5e7eb 100%) !important;
+  border: 1px solid #9ca3af !important;
+  border-top-color: #f3f4f6 !important;
+  border-bottom-color: #4b5563 !important;
+  color: #1f2937 !important;
+  box-shadow: 
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 2px 4px rgba(0, 0, 0, 0.08),
+    0 1px 1px rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.1s ease-in-out !important;
+}
+
+.skeuo-btn:hover {
+  background: linear-gradient(180deg, #f9fafb 0%, #d1d5db 100%) !important;
+}
+
+.skeuo-btn:active {
+  transform: translateY(1px) !important;
+  box-shadow: 
+    0 0 1px rgba(0, 0, 0, 0.1),
+    inset 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+  border-top-color: #6b7280 !important;
+  border-bottom-color: #e5e7eb !important;
+}
+
+:global(.dark) .skeuo-btn,
+.dark .skeuo-btn {
+  background: linear-gradient(180deg, #334155 0%, #1e293b 100%) !important;
+  border: 1px solid #0f172a !important;
+  border-top-color: #475569 !important;
+  border-bottom-color: #020617 !important;
+  color: #f3f4f6 !important;
+  box-shadow: 
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 2px 4px rgba(0, 0, 0, 0.25) !important;
+}
+
+:global(.dark) .skeuo-btn:hover,
+.dark .skeuo-btn:hover {
+  background: linear-gradient(180deg, #475569 0%, #334155 100%) !important;
+}
+
+:global(.dark) .skeuo-btn:active,
+.dark .skeuo-btn:active {
+  transform: translateY(1px) !important;
+  box-shadow: 
+    0 0 1px rgba(0, 0, 0, 0.2),
+    inset 0 3px 6px rgba(0, 0, 0, 0.45) !important;
+  border-top-color: #020617 !important;
+  border-bottom-color: #334155 !important;
+}
+
+/* Tactile Brand Red Button (Embossed look) */
+.skeuo-btn-red {
+  background: linear-gradient(180deg, #ff4c6c 0%, #e4002b 50%, #b3001f 100%) !important;
+  border: 1px solid #7f0015 !important;
+  border-top-color: #ff99ab !important;
+  border-bottom-color: #4c000d !important;
+  color: #ffffff !important;
+  box-shadow: 
+    0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 3px 6px rgba(228, 0, 43, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.1s ease-in-out !important;
+}
+
+.skeuo-btn-red:hover {
+  background: linear-gradient(180deg, #ff6681 0%, #f00d38 50%, #c90224 100%) !important;
+}
+
+.skeuo-btn-red:active {
+  transform: translateY(1px) !important;
+  box-shadow: 
+    0 0 1px rgba(0, 0, 0, 0.2),
+    inset 0 4px 8px rgba(0, 0, 0, 0.4) !important;
+  border-top-color: #660010 !important;
+  border-bottom-color: #ff99ab !important;
+}
+
+/* Tactile Green Button */
+.skeuo-btn-emerald {
+  background: linear-gradient(180deg, #34d399 0%, #059669 50%, #047857 100%) !important;
+  border: 1px solid #064e3b !important;
+  border-top-color: #6ee7b7 !important;
+  border-bottom-color: #022c22 !important;
+  color: #ffffff !important;
+  box-shadow: 
+    0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 3px 6px rgba(5, 150, 105, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.1s ease-in-out !important;
+}
+
+.skeuo-btn-emerald:hover {
+  background: linear-gradient(180deg, #6ee7b7 0%, #10b981 50%, #059669 100%) !important;
+}
+
+.skeuo-btn-emerald:active {
+  transform: translateY(1px) !important;
+  box-shadow: 
+    0 0 1px rgba(0, 0, 0, 0.2),
+    inset 0 4px 8px rgba(0, 0, 0, 0.4) !important;
+  border-top-color: #047857 !important;
+  border-bottom-color: #6ee7b7 !important;
+}
+
+/* Debossed Inset Input */
+.skeuo-input {
+  background-color: #f9fafb !important;
+  border: 1px solid #cbd5e1 !important;
+  border-top-color: #94a3b8 !important;
+  border-left-color: #94a3b8 !important;
+  border-bottom-color: #f1f5f9 !important;
+  border-right-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.08),
+    inset 0 1px 2px rgba(0, 0, 0, 0.04),
+    0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+}
+
+.skeuo-input:focus {
+  border-color: #e4002b !important;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.08),
+    0 0 0 3px rgba(228, 0, 43, 0.15) !important;
+}
+
+:global(.dark) .skeuo-input,
+.dark .skeuo-input {
+  background-color: #090d16 !important;
+  border: 1px solid #1e293b !important;
+  border-top-color: #020617 !important;
+  border-left-color: #020617 !important;
+  border-bottom-color: #334155 !important;
+  border-right-color: #334155 !important;
+  color: #f3f4f6 !important;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+:global(.dark) .skeuo-input:focus,
+.dark .skeuo-input:focus {
+  border-color: #e4002b !important;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    0 0 0 3px rgba(228, 0, 43, 0.3) !important;
+}
+
+/* Brushed Gold Metallic Card */
+.skeuo-gold-card {
+  background: linear-gradient(135deg, #fef08a 0%, #eab308 30%, #ca8a04 70%, #854d0e 100%) !important;
+  border: 1px solid #854d0e !important;
+  border-top-color: #fef9c3 !important;
+  border-bottom-color: #451a03 !important;
+  border-left-color: #ca8a04 !important;
+  border-right-color: #ca8a04 !important;
+  box-shadow: 
+    0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 6px 18px rgba(0, 0, 0, 0.15),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.15) !important;
+}

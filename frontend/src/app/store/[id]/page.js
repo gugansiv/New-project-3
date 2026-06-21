@@ -11,8 +11,13 @@ import {
   apiUpdateOrderStatus, 
   getToken, 
   clearToken,
+  getDecodedToken,
   apiFetchStoreOps,
-  apiPostStoreOp
+  apiPostStoreOp,
+  apiFetchMessages,
+  apiPostMessage,
+  getActiveOrdersKey,
+  getCompletedOrdersKey
 } from '../../db-sync';
 
 export default function StoreDashboard() {
@@ -30,6 +35,10 @@ export default function StoreDashboard() {
   const [storeEmail, setStoreEmail] = useState('');
   const [storePassword, setStorePassword] = useState('');
   const [authError, setAuthError] = useState('');
+  
+  // Chat & Communication states
+  const [chatMessages, setChatMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
 
   // Dashboard Tabs
   const [activeTab, setActiveTab] = useState('orders'); // 'orders', 'expenses', 'staff', 'waste', 'stock', 'reports'
@@ -105,24 +114,45 @@ export default function StoreDashboard() {
       }
 
       // Load Active Orders
-      const savedActive = localStorage.getItem('ccc_active_orders');
+      const savedActive = localStorage.getItem(getActiveOrdersKey());
       if (savedActive) {
         const parsedActive = JSON.parse(savedActive);
         setActiveOrders(parsedActive.filter(o => o.storeId === storeId));
       }
 
       // Load Completed Orders
-      const savedCompleted = localStorage.getItem('ccc_completed_orders');
+      const savedCompleted = localStorage.getItem(getCompletedOrdersKey());
       if (savedCompleted) {
         const parsedCompleted = JSON.parse(savedCompleted);
         setCompletedOrders(parsedCompleted.filter(o => o.storeId === storeId));
       }
-
       // Load User
+      const storeToken = getToken();
       const savedUser = localStorage.getItem('ccc_current_user');
-      if (savedUser) {
-        setCurrentUser(JSON.parse(savedUser));
+      if (storeToken && savedUser) {
+        try {
+          const decoded = getDecodedToken();
+          const parsedUser = JSON.parse(savedUser);
+          const hasAccess = decoded && (
+            decoded.role === 'admin' || 
+            (decoded.role === 'store_manager' && decoded.storeId === storeId)
+          );
+          
+          if (hasAccess && decoded.exp > Date.now() / 1000) {
+            setCurrentUser(parsedUser);
+          } else {
+            localStorage.removeItem('ccc_current_user');
+            setCurrentUser(null);
+          }
+        } catch (e) {
+          localStorage.removeItem('ccc_current_user');
+          setCurrentUser(null);
+        }
+      } else {
+        localStorage.removeItem('ccc_current_user');
+        setCurrentUser(null);
       }
+
     };
 
     init();
@@ -143,13 +173,13 @@ export default function StoreDashboard() {
         if (updatedStore) setStore(updatedStore);
       }
 
-      const active = localStorage.getItem('ccc_active_orders');
+      const active = localStorage.getItem(getActiveOrdersKey());
       if (active) {
         const parsedActive = JSON.parse(active);
         setActiveOrders(parsedActive.filter(o => o.storeId === storeId));
       }
 
-      const completed = localStorage.getItem('ccc_completed_orders');
+      const completed = localStorage.getItem(getCompletedOrdersKey());
       if (completed) {
         const parsedCompleted = JSON.parse(completed);
         setCompletedOrders(parsedCompleted.filter(o => o.storeId === storeId));
@@ -259,17 +289,17 @@ export default function StoreDashboard() {
       const result = await apiUpdateOrderStatus(orderId, newStatus);
       
       if (result.active_orders) {
-        localStorage.setItem('ccc_active_orders', JSON.stringify(result.active_orders));
+        localStorage.setItem(getActiveOrdersKey(), JSON.stringify(result.active_orders));
         setActiveOrders(result.active_orders.filter(o => o.storeId === storeId));
       }
       if (result.completed_orders) {
-        localStorage.setItem('ccc_completed_orders', JSON.stringify(result.completed_orders));
+        localStorage.setItem(getCompletedOrdersKey(), JSON.stringify(result.completed_orders));
         setCompletedOrders(result.completed_orders.filter(o => o.storeId === storeId));
       }
 
       // If completed, update store revenue locally
       if (newStatus === 'Completed') {
-        const savedActiveStr = localStorage.getItem('ccc_active_orders') || '[]';
+        const savedActiveStr = localStorage.getItem(getActiveOrdersKey()) || '[]';
         const allActiveOrders = JSON.parse(savedActiveStr);
         const orderToUpdate = allActiveOrders.find(o => o.id === orderId) || 
           (result.completed_orders || []).find(o => o.id === orderId);
@@ -297,14 +327,43 @@ export default function StoreDashboard() {
     }
   };
 
-  const cancelOrder = (orderId) => {
-    const savedActiveStr = localStorage.getItem('ccc_active_orders') || '[]';
-    const allActiveOrders = JSON.parse(savedActiveStr);
-    const updatedActive = allActiveOrders.filter(o => o.id !== orderId);
-    localStorage.setItem('ccc_active_orders', JSON.stringify(updatedActive));
-    setActiveOrders(updatedActive.filter(o => o.storeId === storeId));
-    pushToServer({ active_orders: updatedActive });
+  const getAvatarUrl = (name) => {
+    const colors = ['E4002B', '10B981', '3B82F6', 'F59E0B', '8B5CF6'];
+    const idx = (name || '').charCodeAt(0) % colors.length;
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || '')}&background=${colors[idx]}&color=fff&bold=true`;
   };
+
+  const cancelOrder = (orderId) => {
+    updateOrderStatus(orderId, 'Rejected');
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+    try {
+      const data = await apiPostMessage(newMessage);
+      setChatMessages(data.messages || []);
+      setNewMessage('');
+    } catch (err) {
+      alert('Failed to send message: ' + err.message);
+    }
+  };
+
+  // Poll messages every 3 seconds
+  useEffect(() => {
+    if (!currentUser) return;
+    const loadMessages = async () => {
+      try {
+        const data = await apiFetchMessages();
+        setChatMessages(data.messages || []);
+      } catch (err) {
+        console.warn('Failed to load chat messages:', err.message);
+      }
+    };
+    loadMessages();
+    const interval = setInterval(loadMessages, 3000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   // Operations handlers
   const handleLogExpense = async (e) => {
@@ -623,7 +682,8 @@ export default function StoreDashboard() {
             { id: 'staff', label: '👥 Staff clock & rota' },
             { id: 'waste', label: '🗑️ Waste Management' },
             { id: 'stock', label: '🥔 Stock & inventory' },
-            { id: 'reports', label: '📊 Daily reports' }
+            { id: 'reports', label: '📊 Daily reports' },
+            { id: 'messages', label: '💬 Communication' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -699,7 +759,7 @@ export default function StoreDashboard() {
                           
                           <div className="border-t border-dashed border-gray-200 pt-3 mt-3 flex justify-between items-center">
                             <div className="text-[10px] font-bold text-gray-500">
-                              Customer: <span className="text-black font-extrabold">{order.customerName}</span> | Payment: <span className="text-black font-extrabold">{order.paymentMethod}</span>
+                              Customer: <span className="text-black font-extrabold">{order.customerName}</span>{order.customerPhone && (<> | Phone: <span className="text-black font-extrabold">{order.customerPhone}</span></>)} | Payment: <span className="text-black font-extrabold">{order.paymentMethod}</span>{order.collectionTime && (<> | Collect: <span className="text-[#E4002B] font-extrabold">{order.collectionTime}</span></>)}
                             </div>
                             <div className="text-base font-black text-black">
                               Total Value: <span className="text-[#E4002B] font-extrabold">₹{order.total.toFixed(2)}</span>
@@ -1571,6 +1631,100 @@ export default function StoreDashboard() {
             </div>
 
           </div>
+        )}
+
+        {/* ==================== TAB 7: COMMUNICATION ==================== */}
+        {activeTab === 'messages' && (
+          <section className="text-left flex border border-gray-200 rounded-xl overflow-hidden shadow-sm h-[600px] bg-white">
+            {/* Chat Sidebar */}
+            <div className="w-64 border-r border-gray-200 bg-gray-50 p-4 flex flex-col justify-between">
+              <div className="space-y-4">
+                <h3 className="text-xs font-black uppercase text-black border-b border-gray-100 pb-2 tracking-wider">
+                  Communication Center
+                </h3>
+                <div className="space-y-1">
+                  {['#general-chat', '#operations-hub', '#restock-support', '#manager-direct'].map((channel, i) => (
+                    <button
+                      key={channel}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        i === 1 
+                          ? 'bg-[#E4002B] text-white font-extrabold shadow-sm' 
+                          : 'text-gray-500 hover:bg-neutral-100 text-gray-700'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        💬 {channel}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="border-t border-gray-200 pt-3 text-[10px] text-gray-400 font-bold">
+                🟢 Operations Broadcast System
+              </div>
+            </div>
+
+            {/* Chat Main Panel */}
+            <div className="flex-1 flex flex-col justify-between bg-white">
+              {/* Chat Header */}
+              <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+                <div>
+                  <h4 className="text-xs font-black uppercase text-black">💬 #operations-hub</h4>
+                  <p className="text-[9px] text-gray-400 font-bold mt-0.5">Real-time status coordination channel with System Administration.</p>
+                </div>
+                <span className="text-[9px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 font-black animate-pulse">
+                  Live broadcast
+                </span>
+              </div>
+
+              {/* Messages Feed */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-4 max-h-[440px]">
+                {chatMessages.map(msg => {
+                  const isMe = msg.sender === currentUser?.name;
+                  return (
+                    <div key={msg.id} className={`flex gap-3 max-w-[80%] ${isMe ? 'ml-auto flex-row-reverse text-right' : 'text-left'}`}>
+                      <img
+                        src={getAvatarUrl(msg.sender)}
+                        alt={msg.sender}
+                        className="w-8 h-8 rounded-full border border-gray-100 shrink-0 self-start mt-1"
+                      />
+                      <div>
+                        <div className={`flex items-baseline gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                          <span className="text-xs font-black text-black">{msg.sender}</span>
+                          <span className="text-[8px] text-gray-400 font-bold">[{msg.storeName || msg.store}] • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <p className={`mt-1.5 p-3 rounded-2xl text-xs font-bold leading-relaxed shadow-sm ${
+                          isMe 
+                            ? 'bg-[#E4002B] text-white rounded-tr-none' 
+                            : 'bg-neutral-100 text-gray-700 rounded-tl-none border border-gray-200/50'
+                        }`}>
+                          {msg.text}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Chat Form Input */}
+              <form onSubmit={handleSendMessage} className="p-3 border-t border-gray-200 flex gap-2 bg-gray-50/50">
+                <input
+                  type="text"
+                  placeholder="Type a message to administration..."
+                  className="flex-1 bg-white border border-gray-200 focus:border-[#E4002B] rounded-full py-2 px-4 text-xs text-black font-bold focus:outline-none transition-colors border-gray-300"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#E4002B] hover:bg-[#C30022] text-white text-xs font-black uppercase rounded-full transition-colors shadow-sm cursor-pointer font-bold"
+                >
+                  Send Chat
+                </button>
+              </form>
+            </div>
+          </section>
         )}
 
       </main>

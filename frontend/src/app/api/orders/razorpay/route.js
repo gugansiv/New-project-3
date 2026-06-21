@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyToken } from '../../auth/token';
+import { initDbTables } from '../../db/db-helper';
+import crypto from 'crypto';
 
 function getAuthUser(request) {
   const authHeader = request.headers.get('Authorization');
@@ -8,17 +10,27 @@ function getAuthUser(request) {
 }
 
 export async function POST(request) {
+  await initDbTables();
+  const user = getAuthUser(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  }
 
   try {
     const body = await request.json();
     const { amount } = body;
 
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: 'Amount is required and must be greater than zero.' }, { status: 400 });
+    // Validate amount bounds (INR paise limit, max 50,000 INR per order)
+    if (!amount || amount <= 0 || amount > 50000) {
+      return NextResponse.json({ error: 'Amount must be between 1 and 50,000 INR.' }, { status: 400 });
     }
 
-    const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_T2egcwXRDwYrv9';
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'ozFBLuw1FMxAWIjP5IKWw223';
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!keyId || !keySecret) {
+      throw new Error('FATAL: Razorpay credentials are not configured on the server.');
+    }
 
     // Convert amount to paise (cents)
     const amountInPaise = Math.round(amount * 100);
@@ -36,15 +48,16 @@ export async function POST(request) {
       body: JSON.stringify({
         amount: amountInPaise,
         currency: 'INR',
-        receipt: `rcpt-${Math.floor(100000 + Math.random() * 900000)}`
+        receipt: `rcpt-${crypto.randomUUID()}`
       })
     });
 
     const rzpData = await rzpResponse.json();
 
     if (!rzpResponse.ok) {
+      console.error('Razorpay API error response:', rzpData);
       return NextResponse.json({ 
-        error: rzpData.error?.description || 'Razorpay order creation failed.' 
+        error: 'Razorpay order creation failed.' 
       }, { status: rzpResponse.status });
     }
 
@@ -56,6 +69,7 @@ export async function POST(request) {
       currency: rzpData.currency
     });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Razorpay order creation route error:', err);
+    return NextResponse.json({ error: 'An internal server error occurred while creating the payment order.' }, { status: 500 });
   }
 }

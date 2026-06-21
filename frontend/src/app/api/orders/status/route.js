@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb } from '../../db/db-helper';
+import { pool, initDbTables } from '../../db/db-helper';
 import { verifyToken } from '../../auth/token';
 
 function getAuthUser(request) {
@@ -10,8 +10,9 @@ function getAuthUser(request) {
 
 // POST /api/orders/status - Update order status (store_manager or admin only)
 export async function POST(request) {
+  await initDbTables();
   const user = getAuthUser(request);
-  if (!user || (user.role !== 'admin' && user.role !== 'store_manager')) {
+  if (!user || (user.role !== 'SUPER_ADMIN' && user.role !== 'BRANCH_MANAGER')) {
     return NextResponse.json({ error: 'Unauthorized. Store manager or admin access required.' }, { status: 401 });
   }
 
@@ -21,32 +22,47 @@ export async function POST(request) {
       return NextResponse.json({ error: 'orderId and newStatus are required.' }, { status: 400 });
     }
 
-    const db = getDb();
-    let activeOrders = [...(db.active_orders || [])];
-    let completedOrders = [...(db.completed_orders || [])];
-    
-    const orderIndex = activeOrders.findIndex(o => o.id === orderId);
-    if (orderIndex === -1) {
-      return NextResponse.json({ error: 'Order not found in active orders.' }, { status: 404 });
+    // Check order exists
+    const orderRes = await pool.query('SELECT * FROM orders WHERE id = $1', [orderId]);
+    if (orderRes.rows.length === 0) {
+      return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
     }
+    const order = orderRes.rows[0];
 
-    const order = activeOrders[orderIndex];
-
-    // Check store_manager can only update orders for their store
-    if (user.role === 'store_manager' && order.storeId !== user.storeId) {
+    // Check store_manager access
+    if (user.role === 'BRANCH_MANAGER' && order.storeId !== user.storeId) {
       return NextResponse.json({ error: 'Access denied. This order is not from your store.' }, { status: 403 });
     }
 
-    if (newStatus === 'Completed') {
-      // Move from active to completed
-      activeOrders.splice(orderIndex, 1);
-      completedOrders = [{ ...order, status: 'Completed' }, ...completedOrders];
-    } else {
-      // Update status in-place
-      activeOrders[orderIndex] = { ...order, status: newStatus };
+    const isMovingToHistory = newStatus === 'Completed' || newStatus === 'Rejected';
+    const isActive = !isMovingToHistory;
+
+    // Update status and isActive in database
+    await pool.query(
+      'UPDATE orders SET status = $1, "isActive" = $2 WHERE id = $3',
+      [newStatus, isActive, orderId]
+    );
+
+    console.log(`[AUDIT] Order ${orderId} status updated to ${newStatus} by ${user.email} (${user.role})`);
+
+    // Fetch updated lists
+    let queryText = 'SELECT * FROM orders WHERE 1=1';
+    const queryParams = [];
+    if (user.role === 'BRANCH_MANAGER') {
+      queryText += ' AND "storeId" = $1';
+      queryParams.push(user.storeId);
     }
 
-    saveDb({ ...db, active_orders: activeOrders, completed_orders: completedOrders });
+    const allRes = await pool.query(queryText, queryParams);
+    const allOrders = allRes.rows.map(o => ({
+      ...o,
+      subtotal: parseFloat(o.subtotal || 0),
+      tax: parseFloat(o.tax || 0),
+      total: parseFloat(o.total || 0)
+    }));
+
+    const activeOrders = allOrders.filter(o => o.isActive === true);
+    const completedOrders = allOrders.filter(o => o.isActive === false);
 
     return NextResponse.json({ 
       success: true, 
@@ -54,6 +70,7 @@ export async function POST(request) {
       completed_orders: completedOrders 
     });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Update order status error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '../db/db-helper';
+import { pool, initDbTables } from '../db/db-helper';
 
 // GET /api/menu - Public: returns the menu items
 export async function GET() {
-  const db = getDb();
-  const { MENU_ITEMS } = await import('../../store-data');
-  const menuItems = db.menu_items || MENU_ITEMS;
-  return NextResponse.json({ menu_items: menuItems });
+  await initDbTables();
+  try {
+    const res = await pool.query('SELECT * FROM menu_items ORDER BY id ASC');
+    const menuItems = res.rows.map(m => ({
+      ...m,
+      price: parseFloat(m.price || 0)
+    }));
+    return NextResponse.json({ menu_items: menuItems });
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 }

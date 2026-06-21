@@ -19,6 +19,49 @@ export function setToken(token) {
 export function clearToken() {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem('ccc_auth_token');
+  localStorage.removeItem('ccc_current_user');
+  localStorage.removeItem('ccc_razorpay_key');
+  localStorage.removeItem('ccc_razorpay_secret');
+  
+  const keys = Object.keys(localStorage);
+  for (const key of keys) {
+    if (
+      key.startsWith('ccc_active_orders_') || 
+      key.startsWith('ccc_completed_orders_') || 
+      key.startsWith('ccc_users')
+    ) {
+      localStorage.removeItem(key);
+    }
+  }
+}
+
+export function getDecodedToken() {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function getActiveOrdersKey() {
+  const decoded = getDecodedToken();
+  if (!decoded) return 'ccc_active_orders_customer';
+  if (decoded.role === 'admin') return 'ccc_active_orders_admin';
+  if (decoded.role === 'store' && decoded.storeId) return `ccc_active_orders_store_${decoded.storeId}`;
+  return 'ccc_active_orders';
+}
+
+export function getCompletedOrdersKey() {
+  const decoded = getDecodedToken();
+  if (!decoded) return 'ccc_completed_orders_customer';
+  if (decoded.role === 'admin') return 'ccc_completed_orders_admin';
+  if (decoded.role === 'store' && decoded.storeId) return `ccc_completed_orders_store_${decoded.storeId}`;
+  return 'ccc_completed_orders';
 }
 
 function authHeaders() {
@@ -252,8 +295,8 @@ export async function syncWithServer() {
     const menu = await fetchMenu();
 
     // Try fetching orders if we have a token
-    let activeOrders = [];
-    let completedOrders = [];
+    let activeOrders = null;
+    let completedOrders = null;
     const token = getToken();
     if (token) {
       try {
@@ -268,14 +311,14 @@ export async function syncWithServer() {
     // Update localStorage cache for offline support
     if (stores) localStorage.setItem('ccc_stores', JSON.stringify(stores));
     if (menu) localStorage.setItem('ccc_menu_items', JSON.stringify(menu));
-    if (activeOrders.length > 0) localStorage.setItem('ccc_active_orders', JSON.stringify(activeOrders));
-    if (completedOrders.length > 0) localStorage.setItem('ccc_completed_orders', JSON.stringify(completedOrders));
+    if (activeOrders !== null) localStorage.setItem(getActiveOrdersKey(), JSON.stringify(activeOrders));
+    if (completedOrders !== null) localStorage.setItem(getCompletedOrdersKey(), JSON.stringify(completedOrders));
 
     return {
       stores: stores || [],
       menu_items: menu || [],
-      active_orders: activeOrders,
-      completed_orders: completedOrders
+      active_orders: activeOrders || [],
+      completed_orders: completedOrders || []
     };
   } catch (err) {
     console.warn('Server sync failed, running in offline mode:', err.message);
@@ -324,4 +367,91 @@ export async function apiPostStoreOp(storeId, action, data) {
     throw new Error(resData.error || 'Failed to execute store operation');
   }
   return resData;
+}
+
+export async function apiAdminUpdateStaff(userData) {
+  const res = await fetch('/api/admin/staff', {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(userData)
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to update staff');
+  }
+  return data;
+}
+
+export async function apiFetchMessages() {
+  const res = await fetch('/api/messages', {
+    headers: authHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to fetch messages');
+  }
+  return data;
+}
+
+export async function apiPostMessage(text) {
+  const res = await fetch('/api/messages', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ text })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to send message');
+  }
+  return data;
+}
+
+// ============ CUSTOMER ENDPOINTS ============
+
+export async function apiGetProfile() {
+  const res = await fetch('/api/customer/profile', {
+    headers: authHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to fetch profile');
+  }
+  return data;
+}
+
+export async function apiUpdateProfile(profileData) {
+  const res = await fetch('/api/customer/profile', {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(profileData)
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to update profile');
+  }
+  return data;
+}
+
+export async function apiGetLoyalty() {
+  const res = await fetch('/api/customer/loyalty', {
+    headers: authHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to fetch loyalty wallet');
+  }
+  return data;
+}
+
+export async function apiSubmitSupportTicket(subject, message, orderId) {
+  const res = await fetch('/api/customer/support', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ subject, message, orderId })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to submit support ticket');
+  }
+  return data;
 }
